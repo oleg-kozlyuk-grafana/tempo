@@ -109,6 +109,23 @@ func (c *RedisClient) MSet(ctx context.Context, keys []string, values [][]byte) 
 		return fmt.Errorf("MSet the length of keys and values not equal, len(keys)=%d, len(values)=%d", len(keys), len(values))
 	}
 
+	// redis.UniversalClient can take redis.Client and redis.ClusterClient.
+	// if redis.Client is set, then Single node or sentinel configuration. pipeline is always supported.
+	// if redis.ClusterClient is set, then Redis Cluster configuration. pipeline may not be supported for keys in different slots.
+	_, isCluster := c.rdb.(*redis.ClusterClient)
+
+	if isCluster {
+		// In cluster mode, perform individual Set operations to avoid CROSSSLOT errors
+		for i := range keys {
+			err := c.rdb.Set(ctx, keys[i], values[i], c.expiration).Err()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// For non-cluster mode, use pipeline for better performance
 	pipe := c.rdb.TxPipeline()
 	for i := range keys {
 		pipe.Set(ctx, keys[i], values[i], c.expiration)
