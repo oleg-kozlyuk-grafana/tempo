@@ -10,7 +10,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/grafana/dskit/flagext"
 )
@@ -68,8 +68,8 @@ func NewRedisClient(cfg *RedisConfig) *RedisClient {
 		SentinelPassword: cfg.SentinelPassword.String(),
 		DB:               cfg.DB,
 		PoolSize:         cfg.PoolSize,
-		IdleTimeout:      cfg.IdleTimeout,
-		MaxConnAge:       cfg.MaxConnAge,
+		ConnMaxIdleTime:  cfg.IdleTimeout,
+		ConnMaxLifetime:  cfg.MaxConnAge,
 	}
 	if cfg.EnableTLS {
 		opt.TLSConfig = &tls.Config{InsecureSkipVerify: cfg.InsecureSkipVerify}
