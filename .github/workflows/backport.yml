@@ -15,8 +15,6 @@ permissions: {}
 
 jobs:
   main:
-    # skip it in all forks, only run in grafana/tempo.
-    if: github.repository == 'grafana/tempo'
     runs-on: ubuntu-latest
     permissions:
       contents: read
