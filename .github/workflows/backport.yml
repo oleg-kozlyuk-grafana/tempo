@@ -36,6 +36,6 @@ jobs:
         with:
           token: ${{ github.token }}
           labelsToAdd: "backport"
-          repo_owner: grafana
+          repo_owner: oleg-kozlyuk-grafana
           repo_name: tempo
           pr_number: ${{ github.event.inputs.pr_number }}
