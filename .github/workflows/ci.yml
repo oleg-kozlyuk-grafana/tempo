@@ -95,10 +95,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.test-target }}
+          name: '*.out'
           path: .coverage/
-          retention-days: 5
-          if-no-files-found: ignore
+          retention-days: 1
+          if-no-files-found: warn
 
   integration-tests:
     name: Run integration tests
@@ -300,13 +300,29 @@ jobs:
           name: coverage-cobertura
           path: .coverage/
 
+      - name: Get latest main branch workflow run
+        id: get-main-run
+        run: |
+          RUN_ID=$(gh run list \
+            --workflow=ci.yml \
+            --branch=main \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        continue-on-error: true
+
       - name: Download baseline coverage from main
-        uses: dawidd6/action-download-artifact@v6
+        if: steps.get-main-run.outputs.run-id != ''
+        uses: actions/download-artifact@v4
         with:
-          workflow: ci.yml
-          branch: main
           name: coverage-cobertura
           path: .coverage-baseline/
+          run-id: ${{ steps.get-main-run.outputs.run-id }}
+          github-token: ${{ github.token }}
         continue-on-error: true
 
       - name: Set up Python
