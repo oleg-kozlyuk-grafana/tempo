@@ -33,6 +33,9 @@ func New(name string, minBucket, numBuckets, bktSize int) *Pool {
 	if minBucket < 0 {
 		panic("invalid min bucket size")
 	}
+	if minBucket > 99999999 {
+		panic("invalid min bucket size")
+	}
 	if bktSize < 1 {
 		panic("invalid bucket size")
 	}
