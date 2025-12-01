@@ -106,6 +106,7 @@ jobs:
           name: coverage-${{ matrix.test-target }}
           path: .coverage/*.out
           retention-days: 1
+          include-hidden-files: true
           if-no-files-found: error
 
   integration-tests:
@@ -284,7 +285,9 @@ jobs:
         with:
           name: coverage-cobertura
           path: .coverage/cobertura.xml
+          include-hidden-files: true
           retention-days: ${{ github.ref == 'refs/heads/main' && 7 || 1 }}
+          if-no-files-found: error
 
   coverage-annotations:
     name: Coverage Annotations
