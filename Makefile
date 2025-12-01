@@ -18,6 +18,7 @@ GOPATH := $(shell go env GOPATH)
 GORELEASER := $(GOPATH)/bin/goreleaser
 GOCOVMERGE := $(GOPATH)/bin/gocovmerge
 GOCOVER_COBERTURA := $(GOPATH)/bin/gocover-cobertura
+GOYACC := $(GOPATH)/bin/goyacc
 
 # Build Images
 DOCKER_PROTOBUF_IMAGE ?= otel/build-protobuf:0.25.0
@@ -326,14 +327,18 @@ gen-proto:  ## Generate proto files
 
 ##@ Gen Traceql
 
-.PHONY: gen-traceql 
-gen-traceql: ## Generate traceql 
-	docker run --rm -v${PWD}:/src/loki ${LOKI_BUILD_IMAGE} gen-traceql-local
+$(GOYACC):
+	go install golang.org/x/tools/cmd/goyacc@58d531046acdc757f177387bc1725bfa79895d69
+
+GOYACC_ARGS = -l -o pkg/traceql/expr.y.go pkg/traceql/expr.y && rm -f y.output
+
+.PHONY: gen-traceql
+gen-traceql: ## Generate traceql
+	docker run --rm -v${PWD}:/src/loki ${LOKI_BUILD_IMAGE} goyacc $(GOYACC_ARGS)
 
 .PHONY: gen-traceql-local
 gen-traceql-local: ## Generate traceq local
-	goyacc -l -o pkg/traceql/expr.y.go pkg/traceql/expr.y && rm -f y.output
-
+	$(GOYACC) $(GOYACC_ARGS)
 
 ##@ Gen Parquet-Query
 
