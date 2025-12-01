@@ -144,18 +144,6 @@ test-with-cover-others: tools ## Run other tests with code coverage
 	mkdir -p $(COVERAGE_DIR)
 	$(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/others.out $(shell go list $(sort $(dir $(OTHERS_SRC))))
 
-.PHONY: coverage-clean
-coverage-clean: ## Clean coverage files
-	rm -rf $(COVERAGE_DIR)
-
-.PHONY: coverage-merge
-coverage-merge: ## Merge all coverage reports
-	$(GOCOVMERGE) $(COVERAGE_DIR)/*.out > $(COVERAGE_DIR)/merged.out
-
-.PHONY: coverage-cobertura
-coverage-cobertura: ## Convert merged coverage to cobertura XML format
-	$(GOCOVER_COBERTURA) < $(COVERAGE_DIR)/merged.out > $(COVERAGE_DIR)/cobertura.xml
-
 # runs e2e tests in the top level integration/e2e directory
 .PHONY: test-e2e
 test-e2e: tools docker-tempo docker-tempo-query  ## Run end to end tests
@@ -216,6 +204,20 @@ ifneq ($(base),)
 else
 	$(LINT_CMD) $(LINT) run --config .golangci.yml
 endif
+
+##@ Code Coverage
+
+.PHONY: coverage-clean
+coverage-clean: ## Clean coverage files
+	rm -rf $(COVERAGE_DIR)
+
+.PHONY: coverage-merge
+coverage-merge: ## Merge all coverage reports
+	$(GOCOVMERGE) $(COVERAGE_DIR)/*.out > $(COVERAGE_DIR)/merged.out
+
+.PHONY: coverage-cobertura
+coverage-cobertura: ## Convert merged coverage to cobertura XML format
+	$(GOCOVER_COBERTURA) < $(COVERAGE_DIR)/merged.out > $(COVERAGE_DIR)/cobertura.xml
 
 ##@ Docker Images
 
