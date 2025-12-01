@@ -239,6 +239,11 @@ jobs:
     needs: [unit-tests]
     if: always() && !cancelled()
     steps:
+      - name: Check out code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
@@ -252,22 +257,16 @@ jobs:
           merge-multiple: true
 
       - name: List downloaded files
-        run: ls .coverage
+        run: ls -la .coverage/
+
+      - name: Install coverage tools
+        run: make tools
 
       - name: Merge coverage data
-        run: |
-          mkdir -p .coverage/merged
-          go tool covdata merge -i=.coverage -o=.coverage/merged
-
-      - name: Convert to text profile
-        run: |
-          go tool covdata textfmt -i=.coverage/merged -o=.coverage/merged.out
-
-      - name: Install gocover-cobertura
-        run: go install github.com/boumenot/gocover-cobertura@latest
+        run: make coverage-merge
 
       - name: Convert to Cobertura XML
-        run: gocover-cobertura < .coverage/merged.out > .coverage/cobertura.xml
+        run: make coverage-cobertura
 
       - name: Upload Cobertura coverage
         uses: actions/upload-artifact@v4
