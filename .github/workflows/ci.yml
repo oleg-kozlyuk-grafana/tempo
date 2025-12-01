@@ -91,11 +91,19 @@ jobs:
       - name: Run Tests
         run: make ${{ matrix.test-target }}
 
+      - name: Debug - Find coverage files
+        if: always()
+        run: |
+          echo "=== Searching for .out files ==="
+          find . -name '*.out' -type f 2>/dev/null || echo "No .out files found"
+          echo "=== Contents of .coverage/ (if exists) ==="
+          ls -la .coverage/ 2>/dev/null || echo ".coverage/ directory does not exist or is empty"
+
       - name: Upload coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: '*.out'
+          name: coverage-${{ matrix.test-target }}
           path: .coverage/
           retention-days: 1
           if-no-files-found: warn
@@ -238,6 +246,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [unit-tests]
     if: always() && !cancelled()
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Check out code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -280,6 +291,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [coverage-report]
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Check out PR branch
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
