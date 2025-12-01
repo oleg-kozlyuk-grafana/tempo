@@ -115,36 +115,40 @@ benchmark: tools ## Run benchmarks
 # Not used in CI, tests are split in pkg, tempodb, tempodb-wal and others in CI jobs
 .PHONY: test-with-cover
 test-with-cover: tools ## Run tests with code coverage
-	mkdir -p $(COVERAGE_DIR)/all
-	GOCOVERDIR=$(COVERAGE_DIR)/all $(GOTEST) $(GOTEST_OPT) -cover $(ALL_PKGS)
+	mkdir -p $(COVERAGE_DIR)
+	$(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/all.out $(ALL_PKGS)
 
 # tests in pkg
 .PHONY: test-with-cover-pkg
 test-with-cover-pkg: tools  ##  Run Tempo packages' tests with code coverage
-	mkdir -p $(COVERAGE_DIR)/pkg
-	GOCOVERDIR=$(COVERAGE_DIR)/pkg $(GOTEST) $(GOTEST_OPT) -cover $(shell go list $(sort $(dir $(shell find . -name '*.go' -path './pkg*/*' -type f | sort))))
+	mkdir -p $(COVERAGE_DIR)
+	$(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/pkg.out $(shell go list $(sort $(dir $(shell find . -name '*.go' -path './pkg*/*' -type f | sort))))
 
 # tests in tempodb (excluding tempodb/wal)
 .PHONY: test-with-cover-tempodb
 test-with-cover-tempodb: tools ## Run tempodb tests with code coverage
-	mkdir -p $(COVERAGE_DIR)/tempodb
-	GOMEMLIMIT=6GiB GOCOVERDIR=$(COVERAGE_DIR)/tempodb $(GOTEST) $(GOTEST_OPT) -cover $(shell go list $(sort $(dir $(shell find . -name '*.go'  -not -path './tempodb/wal*/*' -path './tempodb*/*' -type f | sort))))
+	mkdir -p $(COVERAGE_DIR)
+	GOMEMLIMIT=6GiB $(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/tempodb.out $(shell go list $(sort $(dir $(shell find . -name '*.go'  -not -path './tempodb/wal*/*' -path './tempodb*/*' -type f | sort))))
 
 # tests in tempodb/wal
 .PHONY: test-with-cover-tempodb-wal
 test-with-cover-tempodb-wal: tools  ## Test tempodb/wal with code coverage
-	mkdir -p $(COVERAGE_DIR)/tempodb-wal
-	GOCOVERDIR=$(COVERAGE_DIR)/tempodb-wal $(GOTEST) $(GOTEST_OPT) -cover $(shell go list $(sort $(dir $(shell find . -name '*.go' -path './tempodb/wal*/*' -type f | sort))))
+	mkdir -p $(COVERAGE_DIR)
+	$(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/tempodb-wal.out $(shell go list $(sort $(dir $(shell find . -name '*.go' -path './tempodb/wal*/*' -type f | sort))))
 
 # all other tests (excluding pkg & tempodb)
 .PHONY: test-with-cover-others
 test-with-cover-others: tools ## Run other tests with code coverage
-	mkdir -p $(COVERAGE_DIR)/others
-	GOCOVERDIR=$(COVERAGE_DIR)/others $(GOTEST) $(GOTEST_OPT) -cover $(shell go list $(sort $(dir $(OTHERS_SRC))))
+	mkdir -p $(COVERAGE_DIR)
+	$(GOTEST) $(GOTEST_OPT) -coverprofile=$(COVERAGE_DIR)/others.out $(shell go list $(sort $(dir $(OTHERS_SRC))))
 
-.PHONY: clean-coverage
-clean-coverage: ## Clean coverage files
+.PHONY: coverage-clean
+coverage-clean: ## Clean coverage files
 	rm -rf $(COVERAGE_DIR)
+
+.PHONY: coverage-merge
+coverage-merge: ## Merge all coverage reports
+	echo "mode: set" > $(COVERAGE_DIR)/merged.out && grep -h -v "^mode:" $(COVERAGE_DIR)/*.out >> $(COVERAGE_DIR)/merged.out
 
 # runs e2e tests in the top level integration/e2e directory
 .PHONY: test-e2e
