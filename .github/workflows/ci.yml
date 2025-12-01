@@ -104,7 +104,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.test-target }}
-          path: .coverage/
+          path: .coverage
           retention-days: 1
           if-no-files-found: warn
 
