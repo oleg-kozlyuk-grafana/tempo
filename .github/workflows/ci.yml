@@ -319,6 +319,7 @@ jobs:
 
       - name: Get latest main branch workflow run
         id: get-main-run
+        working-directory: ./main-source
         run: |
           RUN_ID=$(gh run list \
             --workflow=ci.yml \
