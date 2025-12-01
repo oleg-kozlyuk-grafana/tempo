@@ -88,6 +88,15 @@ jobs:
       - name: Run Tests
         run: make ${{ matrix.test-target }}
 
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.test-target }}
+          path: .coverage/
+          retention-days: 5
+          if-no-files-found: ignore
+
   integration-tests:
     name: Run integration tests
     runs-on: ubuntu-24.04
