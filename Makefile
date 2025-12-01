@@ -330,9 +330,9 @@ gen-proto:  ## Generate proto files
 gen-traceql: ## Generate traceql 
 	docker run --rm -v${PWD}:/src/loki ${LOKI_BUILD_IMAGE} gen-traceql-local
 
-.PHONY: gen-traceql-local 
+.PHONY: gen-traceql-local
 gen-traceql-local: ## Generate traceq local
-	goyacc -o pkg/traceql/expr.y.go pkg/traceql/expr.y && rm y.output
+	goyacc -l -o pkg/traceql/expr.y.go pkg/traceql/expr.y && rm -f y.output
 
 
 ##@ Gen Parquet-Query
