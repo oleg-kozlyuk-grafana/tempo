@@ -34,7 +34,6 @@ import (
 	"github.com/grafana/tempo/tempodb/encoding"
 	"github.com/grafana/tempo/tempodb/encoding/common"
 	v2 "github.com/grafana/tempo/tempodb/encoding/v2"
-	"github.com/grafana/tempo/tempodb/encoding/vparquet2"
 	"github.com/grafana/tempo/tempodb/encoding/vparquet4"
 	"github.com/grafana/tempo/tempodb/encoding/vparquet5"
 	"github.com/grafana/tempo/tempodb/wal"
@@ -46,11 +45,8 @@ const attributeWithTerminalChars = `{ } ( ) = ~ ! < > & | ^`
 
 func TestSearchCompleteBlock(t *testing.T) {
 	t.Parallel()
-	for _, v := range encoding.AllEncodings() {
+	for _, v := range encoding.AllEncodingsForWrites() {
 		vers := v.Version()
-		if vers == vparquet2.VersionString {
-			continue // vParquet2 is deprecated
-		}
 		t.Run(vers, func(t *testing.T) {
 			t.Parallel()
 			runCompleteBlockSearchTest(t, vers,
@@ -1095,11 +1091,6 @@ func traceQLStructural(t *testing.T, _ *tempopb.Trace, wantMeta *tempopb.TraceSe
 }
 
 func nestedSet(t *testing.T, _ *tempopb.Trace, wantMeta *tempopb.TraceSearchMetadata, _, _ []*tempopb.SearchRequest, meta *backend.BlockMeta, r Reader, _ common.BackendBlock) {
-	// nested set queries only supported in 3 or greater
-	if meta.Version == vparquet2.VersionString {
-		return
-	}
-
 	ctx := context.Background()
 	e := traceql.NewEngine()
 
@@ -2659,12 +2650,8 @@ func TestSearchForTagsAndTagValues(t *testing.T) {
 }
 
 func TestSearchByShortTraceID(t *testing.T) {
-	for _, v := range encoding.AllEncodings() {
+	for _, v := range encoding.AllEncodingsForWrites() {
 		if v.Version() == v2.VersionString { // no support of the feature in v2
-			continue
-		}
-
-		if v.Version() == vparquet2.VersionString { // vparquet2 is deprecated
 			continue
 		}
 

@@ -694,12 +694,12 @@ github.com/grafana/dskit/tenant
 github.com/grafana/dskit/test
 github.com/grafana/dskit/tracing
 github.com/grafana/dskit/user
-# github.com/grafana/e2e v0.1.2-0.20250825134630-3cea6f657739
-## explicit; go 1.23.0
+# github.com/grafana/e2e v0.1.2-0.20251205060319-9884d3ffb1bf
+## explicit; go 1.24.0
 github.com/grafana/e2e
 github.com/grafana/e2e/db
 github.com/grafana/e2e/images
-# github.com/grafana/gomemcache v0.0.0-20251008140118-65a671e12fdf
+# github.com/grafana/gomemcache v0.0.0-20251127154401-74f93547077b
 ## explicit; go 1.21
 github.com/grafana/gomemcache/memcache
 # github.com/grafana/otel-profiling-go v0.5.1
@@ -837,7 +837,7 @@ github.com/jcmturner/gokrb5/v8/types
 ## explicit; go 1.13
 github.com/jcmturner/rpc/v2/mstypes
 github.com/jcmturner/rpc/v2/ndr
-# github.com/jedib0t/go-pretty/v6 v6.7.3
+# github.com/jedib0t/go-pretty/v6 v6.7.5
 ## explicit; go 1.18
 github.com/jedib0t/go-pretty/v6/table
 github.com/jedib0t/go-pretty/v6/text
@@ -907,7 +907,7 @@ github.com/magefile/mage/sh
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mark3labs/mcp-go v0.43.0
+# github.com/mark3labs/mcp-go v0.43.2
 ## explicit; go 1.23.0
 github.com/mark3labs/mcp-go/client
 github.com/mark3labs/mcp-go/client/transport
@@ -1432,7 +1432,7 @@ github.com/twmb/franz-go/pkg/sasl/scram
 # github.com/twmb/franz-go/pkg/kadm v1.17.1
 ## explicit; go 1.24.0
 github.com/twmb/franz-go/pkg/kadm
-# github.com/twmb/franz-go/pkg/kfake v0.0.0-20251123185109-2b5c574e9ddd
+# github.com/twmb/franz-go/pkg/kfake v0.0.0-20251203184636-c3eeb81fdaf1
 ## explicit; go 1.24.0
 github.com/twmb/franz-go/pkg/kfake
 # github.com/twmb/franz-go/pkg/kmsg v1.12.0
@@ -1457,9 +1457,6 @@ github.com/twmb/murmur3
 # github.com/ua-parser/uap-go v0.0.0-20241012191800-bbb40edc15aa
 ## explicit
 github.com/ua-parser/uap-go/uaparser
-# github.com/uber-go/atomic v1.4.0
-## explicit
-github.com/uber-go/atomic
 # github.com/uber/jaeger-client-go v2.30.0+incompatible
 ## explicit
 github.com/uber/jaeger-client-go
@@ -2018,7 +2015,7 @@ go.uber.org/goleak/internal/stack
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# go.uber.org/zap v1.27.0
+# go.uber.org/zap v1.27.1
 ## explicit; go 1.19
 go.uber.org/zap
 go.uber.org/zap/buffer
@@ -2433,11 +2430,11 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/apimachinery v0.34.2
+# k8s.io/apimachinery v0.34.3
 ## explicit; go 1.24.0
 k8s.io/apimachinery/pkg/util/runtime
 k8s.io/apimachinery/pkg/util/sets
-# k8s.io/client-go v0.34.1 => k8s.io/client-go v0.34.2
+# k8s.io/client-go v0.34.1 => k8s.io/client-go v0.34.3
 ## explicit; go 1.24.0
 k8s.io/client-go/tools/metrics
 k8s.io/client-go/util/workqueue
@@ -2453,6 +2450,6 @@ k8s.io/klog/v2/internal/sloghandler
 # k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 ## explicit; go 1.18
 k8s.io/utils/clock
-# k8s.io/api => k8s.io/api v0.34.2
-# k8s.io/client-go => k8s.io/client-go v0.34.2
+# k8s.io/api => k8s.io/api v0.34.3
+# k8s.io/client-go => k8s.io/client-go v0.34.3
 # github.com/hashicorp/memberlist => github.com/grafana/memberlist v0.3.1-0.20251024160842-5cd332c2849a

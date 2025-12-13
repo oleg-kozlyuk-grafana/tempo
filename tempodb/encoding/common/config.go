@@ -71,9 +71,13 @@ func ValidateConfig(b *BlockConfig) error {
 		return fmt.Errorf("positive value required for bloom-filter shard size")
 	}
 
-	if b.Version == "vParquet2" {
+	// Check for deprecated version,
+	// TODO - Cyclic dependency makes this awkward to improve by using the
+	// deprecation information in the encoding itself, in the versioned logic
+	// in the parent folder. So we are checking raw strings here.
+	/*if b.Version == "vParquet2" {
 		return fmt.Errorf(DeprecatedError, "vParquet2", "vParquet3")
-	}
+	}*/
 
 	return b.DedicatedColumns.Validate()
 }

@@ -8,11 +8,18 @@
 * [CHANGE] Expose metrics_generator.native_histogram_bucket_factor and native_histogram_min_reset_duration to user-configurable overrides API [#5973](https://github.com/grafana/tempo/pull/5973) (@carles-grafana)
 * [CHANGE] Remove remaining aws-sdk-go references and migrate tests to MinIO [#5856](https://github.com/grafana/tempo/pull/5856) (@anglerfishlyy)
 * [CHANGE] **BREAKING CHANGE** Validate tenant ID in frontend and distributor [#5786](https://github.com/grafana/tempo/pull/5786) (@carles-grafana)
+* [CHANGE] Remove vParquet2 encoding [#6071](https://github.com/grafana/tempo/pull/6071) (@mdisibio)
+  **BREAKING CHANGE** In the last release vParquet2 was deprecated and blocked from writes. Now, it's
+  removed entirely. It will no longer be recognized as a valid encoding and cannot read any remaining vParquet2 blocks. Installations
+  running with historical defaults should not require any changes as the default has been migrated for several releases. Installations
+  with storage settings pinned to vParquet2 must run a previous release configured for vParquet3 or higher until all existing vParquet2 blocks
+  have expired and been deleted from the backend, or else it will encounter read errors after upgrading to this release.
 * [CHANGE] Remove busybox from Tempo image to make it more minimal and prevent future vulnerabilities [#5717](https://github.com/grafana/tempo/pull/5717) (@carles-grafana)
 * [CHANGE] Allow RetryInfo to be disabled in per tenant overrides [#5741](https://github.com/grafana/tempo/pull/5741) (@electron0zero)
 * [CHANGE] Added a single binary 3.0 mode `--target=all-3.0` to begin testing single binary 3.0 and updating integration tests. [#6021](https://github.com/grafana/tempo/pull/6021) (@joe-elliott)
   This will be removed in 3.0 and become the standard single binary mode.
 * [CHANGE] Upgrade Tempo to go 1.25.4 [#5939](https://github.com/grafana/tempo/pull/5939) [#6001](https://github.com/grafana/tempo/pull/6001) (@ruslan-mikhailov)
+* [CHANGE] Kafka KIP-714 telemetry is enabled by default. Added `disable_kafka_telemetry` config flag to opt-out [#6046](https://github.com/grafana/tempo/pull/6046) (@oleg-kozlyuk-grafana)
 * [FEATURE] Add `tempo_metrics_generator_registry_active_series_demand_estimate` that estimates metrics-generator active series demand even when the active series limit is reached [#5710](https://github.com/grafana/tempo/pull/5710) (@carles-grafana)
 * [FEATURE] Added validation mode and tests for tempo-vulture [#5605](https://github.com/grafana/tempo/pull/5605) (@davidham)
 * [FEATURE] New block encoding vParquet5-preview3 replacing well-known attributes with dedicated column defaults. This format is in development and breaking changes are expected before final release. [#5696](https://github.com/grafana/tempo/pull/5696) (@stoewer)
@@ -22,7 +29,9 @@
 * [FEATURE] New block encoding vParquet5-preview5 with virtual span row numbers. This is a preview, breaking changes are expected. [#5943](https://github.com/grafana/tempo/pull/5943) (@stoewer)
 * [FEATURE] Add SSE-C encryption support to S3 backend [#5789](https://github.com/grafana/tempo/pull/5789) (@steffsas)
 * [FEATURE] Add support for `Accept: application/vnd.grafana.llm` to Tempo endpoints. Currently supported directly by trace by id and tag values [#5961](https://github.com/grafana/tempo/pull/5961) (@joe-elliott)
+* [FEATURE] add database_name_attributes config to service graph processor [#5398](https://github.com/grafana/tempo/pull/5398) (@KyriosGN0)
   This response is subject to change and should not be relied on. It is intended for LLM consumption only. Even a fundamental change to its representation (yaml? markdown?) would not be considered breaking.
+* [FEATURE] Metrics generator will now produce overflow series to capture new data once limits are hit. These series have the label `metric_overflow="true"`. [#5954](https://github.com/grafana/tempo/pull/5954) (@Logiraptor)
 * [ENHANCEMENT] docs: Add explicit notes about authentication [#5735](https://github.com/grafana/tempo/pull/5735) (@electron0zero)
 * [ENHANCEMENT] On startup, first record for live store to consume is not older than two complete block timeouts [#5693](https://github.com/grafana/tempo/pull/5693) (@ruslan-mikhailov)
 * [ENHANCEMENT] Add secure connection support to tempo-cli [#5692](https://github.com/grafana/tempo/pull/5692) (@TheoBrigitte)
