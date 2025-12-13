@@ -1,0 +1,93 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bench",
+    "crates/cli",
+    "crates/config",
+    "crates/context",
+    "crates/provider",
+    "crates/querier",
+    "crates/storage",
+    "crates/tests",
+    "crates/traceql",
+    "crates/vparquet4",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+
+[workspace.dependencies]
+# Internal crates
+cli = { path = "crates/cli" }
+config = { path = "crates/config" }
+context = { path = "crates/context" }
+storage = { path = "crates/storage" }
+traceql = { path = "crates/traceql" }
+provider = { path = "crates/provider" }
+
+# External dependencies
+anyhow = "1.0"
+arrow = "56.0.0"
+async-trait = "0.1"
+axum = "0.7"
+bytes = "1.11"
+chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+comfy-table = "7.2"
+config-rs = { package = "config", version = "0.15" }
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+datafusion = { version = "51.0.0", features = ["parquet"] }
+datafusion-datasource = "51.0.0"
+datafusion-physical-plan = "51.0.0"
+dirs = "6.0.0"
+flate2 = "1.1"
+futures = "0.3.31"
+futures-util = "0.3"
+hex = "0.4"
+humansize = "2.1"
+hyper = "1.8"
+object_store = { version = "0.12", features = ["http", "aws"] }
+parquet = { version = "56.0.0", features = ["async", "object_store", "experimental"] }
+prost = "0.13"
+prost-build = "0.13"
+prost-types = "0.13"
+rustyline = "17.0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+test_each_file = "0.3"
+thiserror = "2.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "full"] }
+tokio-test = "0.4"
+tonic = "0.12"
+tonic-build = "0.12"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5"
+ustr = "1.0"
+async-stream = "0.3"
+backoff = "0.4"
+hostname = "0.4"
+http = "1.0"
+http-body-util = "0.1"
+num_cpus = "1.16"
+prometheus = "0.13"
+tokio-stream = "0.1"
+vparquet4 = { path = "crates/vparquet4" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+# codegen-units = 16
+strip = true
+panic = "unwind"
+
+[profile.bench]
+opt-level = 2
+inherits = "release"
+lto = "thin"
+debug = true
+strip = false

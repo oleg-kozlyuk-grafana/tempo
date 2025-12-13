@@ -1479,12 +1479,13 @@ func BenchmarkBackendBlockTraceQL(b *testing.B) {
 		{"mixed", `{resource.namespace!="" && resource.service.name="cortex-gateway" && duration>50ms && resource.cluster=~"prod.*"}`},
 		{"complex", `{resource.k8s.cluster.name =~ "prod.*" && resource.k8s.namespace.name = "hosted-grafana" && resource.k8s.container.name="hosted-grafana-gateway" && name = "httpclient/grafana" && span.http.status_code = 200 && duration > 20ms}`},
 		{"select", `{resource.k8s.cluster.name =~ "prod.*" && resource.k8s.namespace.name = "tempo-prod"} | select(resource.container)`},
+		{"rate", "{} | rate()"},
 	}
 
 	ctx := context.TODO()
 	opts := common.DefaultSearchOptions()
-	opts.StartPage = 3
-	opts.TotalPages = 7
+	opts.StartPage = 0
+	opts.TotalPages = 10000000
 
 	block := blockForBenchmarks(b)
 	_, _, err := block.openForSearch(ctx, opts)
