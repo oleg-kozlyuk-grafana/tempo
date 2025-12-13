@@ -149,6 +149,11 @@ impl QueryExecutor {
 
     /// Convert DataFusion results to SearchResponse
     fn convert_to_search_response(&self, batches: Vec<RecordBatch>) -> Result<SearchResponse> {
+        /// Helper to create a missing column error
+        fn missing_column(name: &str) -> QuerierError {
+            QuerierError::QueryExecution(format!("Missing {} column", name))
+        }
+
         let mut traces = Vec::new();
         let mut inspected_traces = 0u32;
 
@@ -161,16 +166,16 @@ impl QueryExecutor {
             // Extract columns
             let trace_id_col = batch
                 .column_by_name("trace_id")
-                .ok_or_else(|| QuerierError::QueryExecution("Missing trace_id column".to_string()))?;
+                .ok_or_else(|| missing_column("trace_id"))?;
             let name_col = batch
                 .column_by_name("name")
-                .ok_or_else(|| QuerierError::QueryExecution("Missing name column".to_string()))?;
+                .ok_or_else(|| missing_column("name"))?;
             let start_time_col = batch
                 .column_by_name("start_time_unix_nano")
-                .ok_or_else(|| QuerierError::QueryExecution("Missing start_time_unix_nano column".to_string()))?;
+                .ok_or_else(|| missing_column("start_time_unix_nano"))?;
             let duration_col = batch
                 .column_by_name("duration_nano")
-                .ok_or_else(|| QuerierError::QueryExecution("Missing duration_nano column".to_string()))?;
+                .ok_or_else(|| missing_column("duration_nano"))?;
 
             // Cast to concrete types
             let trace_ids = trace_id_col
@@ -184,11 +189,11 @@ impl QueryExecutor {
             let start_times = start_time_col
                 .as_any()
                 .downcast_ref::<UInt64Array>()
-                .ok_or_else(|| QuerierError::QueryExecution("Invalid start_time type".to_string()))?;
+                .ok_or_else(|| QuerierError::QueryExecution("Invalid start_time_unix_nano type".to_string()))?;
             let durations = duration_col
                 .as_any()
                 .downcast_ref::<UInt64Array>()
-                .ok_or_else(|| QuerierError::QueryExecution("Invalid duration type".to_string()))?;
+                .ok_or_else(|| QuerierError::QueryExecution("Invalid duration_nano type".to_string()))?;
 
             // Build trace metadata
             for i in 0..num_rows {

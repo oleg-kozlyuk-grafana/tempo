@@ -28,6 +28,17 @@ impl FrontendProcessor {
         }
     }
 
+    /// Parse a request URL, adding http:// prefix if needed
+    fn parse_request_url(url_str: &str) -> Result<url::Url> {
+        let full_url = if url_str.starts_with("http://") || url_str.starts_with("https://") {
+            url_str.to_string()
+        } else {
+            format!("http://localhost{}", url_str)
+        };
+        url::Url::parse(&full_url)
+            .map_err(|e| QuerierError::StreamProcessing(format!("Failed to parse URL: {}", e)))
+    }
+
     /// Process queries on a single stream with automatic retry
     pub async fn process_queries_on_single_stream(
         &self,
@@ -219,22 +230,14 @@ impl FrontendProcessor {
         );
 
         // Parse URL to determine endpoint
-        let full_url = if request.url.starts_with("http://") || request.url.starts_with("https://") {
-            request.url.clone()
-        } else {
-            format!("http://localhost{}", request.url)
-        };
-
-        let url = url::Url::parse(&full_url).map_err(|e| {
-            QuerierError::StreamProcessing(format!("Failed to parse URL: {}", e))
-        })?;
+        let url = Self::parse_request_url(&request.url)?;
 
         // Route to appropriate handler
         let http_response = match url.path() {
             "/api/search" => self.handle_search_request(&url).await,
             _ => {
                 tracing::warn!(path = url.path(), "Unknown endpoint");
-                Ok(create_not_found_response())
+                Ok(create_json_error_response(404, "Endpoint not found"))
             }
         }?;
 
@@ -322,28 +325,22 @@ impl FrontendProcessor {
             let processor = self.clone();
             let handle = tokio::spawn(async move {
                 // Parse URL
-                let full_url = if request.url.starts_with("http://") || request.url.starts_with("https://") {
-                    request.url.clone()
-                } else {
-                    format!("http://localhost{}", request.url)
-                };
-
-                let url = match url::Url::parse(&full_url) {
+                let url = match FrontendProcessor::parse_request_url(&request.url) {
                     Ok(u) => u,
                     Err(e) => {
                         tracing::error!(error = %e, "Failed to parse URL");
-                        return create_error_response(400, "Invalid URL");
+                        return create_json_error_response(400, "Invalid URL");
                     }
                 };
 
                 // Route to appropriate handler
                 match url.path() {
                     "/api/search" => processor.handle_search_request(&url).await,
-                    _ => Ok(create_not_found_response()),
+                    _ => Ok(create_json_error_response(404, "Endpoint not found")),
                 }
                 .unwrap_or_else(|e| {
                     tracing::error!(error = %e, "Request processing failed");
-                    create_error_response(500, &format!("Internal error: {}", e))
+                    create_json_error_response(500, &format!("Internal error: {}", e))
                 })
             });
             handles.push(handle);
@@ -356,7 +353,7 @@ impl FrontendProcessor {
                 Ok(response) => responses.push(response),
                 Err(e) => {
                     tracing::error!(error = %e, "Task join error");
-                    responses.push(create_error_response(500, "Internal error"));
+                    responses.push(create_json_error_response(500, "Internal error"));
                 }
             }
         }
@@ -376,40 +373,8 @@ impl FrontendProcessor {
     }
 }
 
-/// Create a "Not Implemented" HTTP response
-fn create_not_implemented_response() -> HttpResponse {
-    let error_body = serde_json::json!({
-        "error": "Query execution not yet implemented"
-    });
-
-    HttpResponse {
-        code: 501, // Not Implemented
-        headers: vec![Header {
-            key: "content-type".to_string(),
-            values: vec!["application/json".to_string()],
-        }],
-        body: serde_json::to_vec(&error_body).unwrap_or_default(),
-    }
-}
-
-/// Create a "Not Found" HTTP response
-fn create_not_found_response() -> HttpResponse {
-    let error_body = serde_json::json!({
-        "error": "Endpoint not found"
-    });
-
-    HttpResponse {
-        code: 404,
-        headers: vec![Header {
-            key: "content-type".to_string(),
-            values: vec!["application/json".to_string()],
-        }],
-        body: serde_json::to_vec(&error_body).unwrap_or_default(),
-    }
-}
-
-/// Create a generic error HTTP response
-fn create_error_response(code: i32, message: &str) -> HttpResponse {
+/// Create a JSON error HTTP response
+fn create_json_error_response(code: i32, message: &str) -> HttpResponse {
     let error_body = serde_json::json!({
         "error": message
     });
@@ -436,15 +401,39 @@ mod tests {
     }
 
     #[test]
-    fn test_not_implemented_response() {
-        let response = create_not_implemented_response();
-        assert_eq!(response.code, 501);
-        assert!(!response.body.is_empty());
+    fn test_parse_request_url_with_http_prefix() {
+        let url = FrontendProcessor::parse_request_url("http://example.com/api/search").unwrap();
+        assert_eq!(url.host_str(), Some("example.com"));
+        assert_eq!(url.path(), "/api/search");
     }
 
     #[test]
-    fn test_not_found_response() {
-        let response = create_not_found_response();
+    fn test_parse_request_url_without_prefix() {
+        let url = FrontendProcessor::parse_request_url("/api/search?q=test").unwrap();
+        assert_eq!(url.host_str(), Some("localhost"));
+        assert_eq!(url.path(), "/api/search");
+        assert_eq!(url.query(), Some("q=test"));
+    }
+
+    #[test]
+    fn test_parse_request_url_invalid() {
+        let result = FrontendProcessor::parse_request_url("not a valid url");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_json_error_response_not_implemented() {
+        let response = create_json_error_response(501, "Query execution not yet implemented");
+        assert_eq!(response.code, 501);
+        assert!(!response.body.is_empty());
+
+        let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        assert_eq!(body["error"], "Query execution not yet implemented");
+    }
+
+    #[test]
+    fn test_json_error_response_not_found() {
+        let response = create_json_error_response(404, "Endpoint not found");
         assert_eq!(response.code, 404);
         assert!(!response.body.is_empty());
 
@@ -454,8 +443,8 @@ mod tests {
     }
 
     #[test]
-    fn test_error_response() {
-        let response = create_error_response(500, "Test error message");
+    fn test_json_error_response_custom() {
+        let response = create_json_error_response(500, "Test error message");
         assert_eq!(response.code, 500);
 
         let body: serde_json::Value = serde_json::from_slice(&response.body).unwrap();

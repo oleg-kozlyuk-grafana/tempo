@@ -76,11 +76,12 @@ http-body-util = "0.1"
 num_cpus = "1.16"
 prometheus = "0.13"
 tokio-stream = "0.1"
+vparquet4 = { path = "crates/vparquet4" }
 
 [profile.release]
 opt-level = 3
-lto = "fat"
-# codegen-units = 1
+lto = "thin"
+# codegen-units = 16
 strip = true
 panic = "unwind"
 

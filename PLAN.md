@@ -215,19 +215,19 @@ pub enum AttributeValue { String(String), Int(i64), Double(f64), Bool(bool), ...
 
 ```toml
 [dependencies]
-parquet = { workspace = true }             # 54.3.1, async feature
+parquet.workspace = true             # 54.3.1, async feature
 arrow = "54.0.0"                           # Arrow arrays for zero-copy
-object_store = { workspace = true }        # S3/GCS/Azure/local backends
-async-trait = { workspace = true }
-tokio = { workspace = true }
-futures-util = { workspace = true }
-anyhow = { workspace = true }
+object_store.workspace = true        # S3/GCS/Azure/local backends
+async-trait.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+anyhow.workspace = true
 thiserror = "1.0"
 bytes = "1.0"
-tracing = { workspace = true }
+tracing.workspace = true
 
 [dev-dependencies]
-criterion = { workspace = true }
+criterion.workspace = true
 tokio-test = "0.4"
 
 [features]

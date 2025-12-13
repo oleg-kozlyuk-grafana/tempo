@@ -80,7 +80,7 @@ pub struct WorkerConfig {
 4. Add dependencies to `Cargo.toml`:
 ```toml
 backoff = "0.4"
-futures = { workspace = true }
+futures.workspace = true
 ```
 
 **Tests:** Config parsing, proto compilation verification
@@ -282,7 +282,7 @@ crates/querier/src/
 ```toml
 [dependencies]
 # Async/Futures
-futures = { workspace = true }
+futures.workspace = true
 
 # Backoff for retries
 backoff = "0.4"
@@ -290,10 +290,10 @@ backoff = "0.4"
 # HTTP types for conversion
 http = "1.0"
 http-body-util = "0.1"
-bytes = { workspace = true }
+bytes.workspace = true
 
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-build.workspace = true
 ```
 
 ## Test Strategy

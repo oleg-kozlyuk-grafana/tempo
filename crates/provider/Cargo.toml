@@ -1,31 +1,31 @@
 [package]
 name = "provider"
-version= { workspace = true }
-edition= { workspace = true }
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-config = { workspace = true }
-storage = { workspace = true }
-vparquet4 = { path = "../vparquet4" }
+config.workspace = true
+storage.workspace = true
+vparquet4.workspace = true
 
-async-trait = { workspace = true }
-async-stream = { workspace = true }
-chrono = { workspace = true }
-comfy-table = { workspace = true }
-datafusion = { workspace = true }
-datafusion-datasource = { workspace = true }
-futures = { workspace = true }
-humansize = { workspace = true }
-parquet = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-url = { workspace = true }
+async-trait.workspace = true
+async-stream.workspace = true
+chrono.workspace = true
+comfy-table.workspace = true
+datafusion.workspace = true
+datafusion-datasource.workspace = true
+futures.workspace = true
+humansize.workspace = true
+parquet.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
 
 [dev-dependencies]
-anyhow = { workspace = true }
-traceql = { workspace = true }
-criterion = { workspace = true }
-bytes = { workspace = true }
+anyhow.workspace = true
+traceql.workspace = true
+criterion.workspace = true
+bytes.workspace = true
 
 [[bench]]
 name = "udf_bench"

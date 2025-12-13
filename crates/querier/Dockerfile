@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.82-bookworm AS builder
+FROM rust:1-trixie AS builder
 
 WORKDIR /build
 
@@ -11,6 +11,7 @@ COPY crates ./crates/
 COPY pkg/tempopb ./pkg/tempopb/
 COPY opentelemetry-proto ./opentelemetry-proto/
 COPY vendor ./vendor/
+COPY modules ./modules/
 
 # Install protobuf compiler
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
@@ -19,7 +20,7 @@ RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/ap
 RUN cargo build --release --package tempo-querier
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && \
     apt-get install -y ca-certificates && \
@@ -31,7 +32,7 @@ WORKDIR /app
 COPY --from=builder /build/target/release/tempo-querier /app/tempo-querier
 
 # Expose gRPC port
-EXPOSE 9095
+EXPOSE 3100
 
 # Run the service
 ENTRYPOINT ["/app/tempo-querier"]

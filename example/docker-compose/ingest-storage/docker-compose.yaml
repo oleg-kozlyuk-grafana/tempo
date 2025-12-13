@@ -92,16 +92,17 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
-  querier-go:
-    image: *tempoImage
-    command: "-target=querier -config.file=/etc/tempo.yaml -log.level=debug"
+  querier-rs:
+    build:
+      context: ../../..
+      dockerfile: crates/querier/Dockerfile
     restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
     ports:
-      - "3200"   # tempo
+      - "3100"   # HTTP/metrics
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+      - FRONTEND_ADDRESS=query-frontend:9095
+      - QUERIER_PARALLELISM=14
+      - RUST_LOG=info
 
   compactor:
     image: *tempoImage
