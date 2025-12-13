@@ -10,7 +10,7 @@ use crate::frontend::{
     frontend_client::FrontendClient, ClientToFrontend, Feature, FrontendToClient, Type,
 };
 use crate::httpgrpc::{Header, HttpResponse};
-use crate::worker::query_executor::QueryExecutor;
+use crate::query_executor::QueryExecutor;
 
 /// Processor that handles bidirectional streaming with the query-frontend
 #[derive(Clone)]
@@ -254,7 +254,7 @@ impl FrontendProcessor {
 
     /// Handle /api/search endpoint
     async fn handle_search_request(&self, url: &url::Url) -> Result<HttpResponse> {
-        use crate::worker::query_executor::SearchParams;
+        use crate::query_executor::SearchParams;
 
         // Parse query parameters
         let params = SearchParams::from_url(url);

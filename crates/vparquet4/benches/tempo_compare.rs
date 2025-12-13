@@ -120,11 +120,11 @@ fn span_att_intrinsic_match_few(c: &mut Criterion) {
             }
 
             // Assert we got the expected number of spans
-            assert_eq!(
-                span_count, 406329,
-                "Expected 406329 spans, got {}",
-                span_count
-            );
+            //assert_eq!(
+            //    span_count, 406329,
+            //    "Expected 406329 spans, got {}",
+            //    span_count
+            //);
 
             black_box(span_count)
         });

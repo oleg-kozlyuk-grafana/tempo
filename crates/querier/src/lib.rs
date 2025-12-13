@@ -34,10 +34,16 @@ pub mod tempopb {
 // Public modules
 pub mod config;
 pub mod error;
+pub mod frontend_processor;
 pub mod http;
-pub mod worker;
+pub mod processor_manager;
+pub mod querier_worker;
+pub mod query_executor;
 
 // Re-exports for convenience
 pub use config::WorkerConfig;
 pub use error::{QuerierError, Result};
-pub use worker::QuerierWorker;
+pub use frontend_processor::FrontendProcessor;
+pub use processor_manager::ProcessorManager;
+pub use querier_worker::QuerierWorker;
+pub use query_executor::{QueryExecutor, SearchParams};

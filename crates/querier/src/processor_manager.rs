@@ -3,7 +3,7 @@ use tonic::transport::Channel;
 
 use crate::error::{QuerierError, Result};
 use crate::frontend::frontend_client::FrontendClient;
-use crate::worker::frontend_processor::FrontendProcessor;
+use crate::frontend_processor::FrontendProcessor;
 
 /// Manages N concurrent processor tasks per connection
 pub struct ProcessorManager {

@@ -4,8 +4,8 @@ use tonic::transport::Channel;
 
 use crate::config::WorkerConfig;
 use crate::error::{QuerierError, Result};
-use crate::worker::frontend_processor::FrontendProcessor;
-use crate::worker::processor_manager::ProcessorManager;
+use crate::frontend_processor::FrontendProcessor;
+use crate::processor_manager::ProcessorManager;
 
 /// Main querier worker that connects to frontends and manages request processing
 pub struct QuerierWorker {
