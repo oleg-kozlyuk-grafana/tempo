@@ -1,107 +1,75 @@
 # Note: this compose file describes obsolete deployment architecture
 # See example/docker-compose/ingest-storage/docker-compose.yaml for newer version
 
+x-tempo-common: &tempo-common
+  image: &tempoImage grafana/tempo:latest
+  restart: always
+  volumes:
+    - ./tempo-distributed.yaml:/etc/tempo.yaml
+  ports:
+    - "3200" # tempo
+  environment:
+    - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+  depends_on:
+    seaweedfs:
+      condition: service_healthy
+
 services:
   distributor:
-    image: &tempoImage grafana/tempo:latest
+    <<: *tempo-common
     command: "-target=distributor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
     ports:
       - "3200" # tempo
       - "4317:4317"
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   ingester-0:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   ingester-1:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   ingester-2:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   query-frontend:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=query-frontend -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   querier:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=querier -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   compactor:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=compactor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   metrics-generator:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
-  minio:
-    image: minio/minio:latest
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
     environment:
-      - MINIO_ACCESS_KEY=tempo
-      - MINIO_SECRET_KEY=supersecret
+      - AWS_ACCESS_KEY_ID=tempo
+      - AWS_SECRET_ACCESS_KEY=supersecret
     ports:
-      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ../shared/seaweedfs-entrypoint.sh:/entrypoint.sh
     entrypoint:
       - sh
-      - -euc
-      - mkdir -p /data/tempo && minio server /data --console-address ':9001'
+      - /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "wget --spider http://127.0.0.1:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   k6-tracing:
     image: ghcr.io/grafana/xk6-client-tracing:v0.0.9
