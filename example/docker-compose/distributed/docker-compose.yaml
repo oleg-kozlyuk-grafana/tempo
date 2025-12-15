@@ -1,119 +1,56 @@
 # Note: this compose file describes obsolete deployment architecture
 # See example/docker-compose/ingest-storage/docker-compose.yaml for newer version
 
+x-tempo-common: &tempo-common
+  image: &tempoImage grafana/tempo:latest
+  restart: always
+  volumes:
+    - ./tempo-distributed.yaml:/etc/tempo.yaml
+  ports:
+    - "3200" # tempo
+  environment:
+    - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+  depends_on:
+    seaweedfs:
+      condition: service_healthy
+
 services:
   distributor:
-    image: &tempoImage grafana/tempo:latest
+    <<: *tempo-common
     command: "-target=distributor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
     ports:
       - "3200" # tempo
       - "4317:4317"
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   ingester-0:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   ingester-1:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   ingester-2:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=ingester -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   query-frontend:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=query-frontend -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   querier:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=querier -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   compactor:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=compactor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
 
   metrics-generator:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
-    restart: always
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
-    volumes:
-      - ./tempo-distributed.yaml:/etc/tempo.yaml
-    ports:
-      - "3200" # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   seaweedfs:
     image: chrislusf/seaweedfs:latest

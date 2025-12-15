@@ -1,3 +1,18 @@
+x-tempo-common: &tempo-common
+  image: &tempoImage grafana/tempo:latest
+  restart: always
+  volumes:
+    - ./tempo.yaml:/etc/tempo.yaml
+  ports:
+    - "3200"   # tempo
+  environment:
+    - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+  depends_on:
+    kafka:
+      condition: service_started
+    seaweedfs:
+      condition: service_healthy
+
 services:
   # Tempo runs as user 10001, and docker compose creates the volume as root.
   # As such, we need to chown the volume in order for Tempo to start correctly.
@@ -12,95 +27,34 @@ services:
       - ./tempo-data:/var/tempo
 
   distributor:
-    image: &tempoImage grafana/tempo:latest
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=distributor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   live-store-zone-a-0:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-a"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
+    hostname: live-store-zone-a-0
     ports:
       - "3201:3200"   # tempo
-    hostname: live-store-zone-a-0
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   live-store-zone-a-1:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-a"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
     hostname: live-store-zone-a-1
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   live-store-zone-b-0:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-b"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
     hostname: live-store-zone-b-0
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   live-store-zone-b-1:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-b"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
     hostname: live-store-zone-b-1
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   query-frontend:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=query-frontend -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200"   # tempo
     depends_on:
@@ -111,102 +65,35 @@ services:
   #      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   querier:
-    image: *tempoImage
+    <<: *tempo-common
     command: "-target=querier -config.file=/etc/tempo.yaml -log.level=debug"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
     depends_on:
       seaweedfs:
         condition: service_healthy
 
   compactor:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=compactor -config.file=/etc/tempo.yaml"
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   metrics-generator-0:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
     hostname: metrics-generator-0
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   metrics-generator-1:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
     hostname: metrics-generator-1
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   block-builder-0:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=block-builder -config.file=/etc/tempo.yaml"
     hostname: block-builder-0
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-      - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   block-builder-1:
-    image: *tempoImage
-    depends_on:
-      kafka:
-        condition: service_started
-      seaweedfs:
-        condition: service_healthy
+    <<: *tempo-common
     command: "-target=block-builder -config.file=/etc/tempo.yaml"
     hostname: block-builder-1
-    restart: always
-    volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
-    ports:
-        - "3200"   # tempo
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
   seaweedfs:
     image: chrislusf/seaweedfs:latest
