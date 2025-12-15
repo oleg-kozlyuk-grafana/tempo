@@ -13,6 +13,9 @@ services:
       - "4317:4317"
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   ingester-0:
     image: *tempoImage
@@ -24,6 +27,9 @@ services:
       - "3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   ingester-1:
     image: *tempoImage
@@ -35,6 +41,9 @@ services:
       - "3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   ingester-2:
     image: *tempoImage
@@ -46,6 +55,9 @@ services:
       - "3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   query-frontend:
     image: *tempoImage
@@ -57,6 +69,9 @@ services:
       - "3200:3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   querier:
     image: *tempoImage
@@ -68,6 +83,9 @@ services:
       - "3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   compactor:
     image: *tempoImage
@@ -79,11 +97,17 @@ services:
       - "3200" # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   metrics-generator:
     image: *tempoImage
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
     restart: always
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
     volumes:
       - ./tempo-distributed.yaml:/etc/tempo.yaml
     ports:
@@ -91,17 +115,24 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
-  minio:
-    image: minio/minio:latest
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
     environment:
-      - MINIO_ACCESS_KEY=tempo
-      - MINIO_SECRET_KEY=supersecret
+      - AWS_ACCESS_KEY_ID=tempo
+      - AWS_SECRET_ACCESS_KEY=supersecret
     ports:
-      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ../shared/seaweedfs-entrypoint.sh:/entrypoint.sh
     entrypoint:
       - sh
-      - -euc
-      - mkdir -p /data/tempo && minio server /data --console-address ':9001'
+      - /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "wget --spider http://127.0.0.1:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   k6-tracing:
     image: ghcr.io/grafana/xk6-client-tracing:v0.0.9

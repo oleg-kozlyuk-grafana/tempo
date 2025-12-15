@@ -14,7 +14,10 @@ services:
   distributor:
     image: &tempoImage grafana/tempo:latest
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=distributor -config.file=/etc/tempo.yaml"
     restart: always
     volumes:
@@ -27,7 +30,10 @@ services:
   live-store-zone-a-0:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-a"
     restart: always
     volumes:
@@ -41,7 +47,10 @@ services:
   live-store-zone-a-1:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-a"
     restart: always
     volumes:
@@ -55,7 +64,10 @@ services:
   live-store-zone-b-0:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-b"
     restart: always
     volumes:
@@ -69,7 +81,10 @@ services:
   live-store-zone-b-1:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=live-store -config.file=/etc/tempo.yaml -live-store.instance-availability-zone=zone-b"
     restart: always
     volumes:
@@ -88,6 +103,9 @@ services:
       - ./tempo.yaml:/etc/tempo.yaml
     ports:
       - "3200:3200"   # tempo
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
   # Uncomment the following lines to enable tracing
   #    environment:
   #      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
@@ -102,11 +120,17 @@ services:
       - "3200"   # tempo
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
 
   compactor:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=compactor -config.file=/etc/tempo.yaml"
     restart: always
     volumes:
@@ -119,7 +143,10 @@ services:
   metrics-generator-0:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
     hostname: metrics-generator-0
     restart: always
@@ -133,7 +160,10 @@ services:
   metrics-generator-1:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=metrics-generator -config.file=/etc/tempo.yaml"
     hostname: metrics-generator-1
     restart: always
@@ -147,7 +177,10 @@ services:
   block-builder-0:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=block-builder -config.file=/etc/tempo.yaml"
     hostname: block-builder-0
     restart: always
@@ -161,7 +194,10 @@ services:
   block-builder-1:
     image: *tempoImage
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      seaweedfs:
+        condition: service_healthy
     command: "-target=block-builder -config.file=/etc/tempo.yaml"
     hostname: block-builder-1
     restart: always
@@ -172,17 +208,24 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
 
-  minio:
-    image: minio/minio:latest
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
     environment:
-      - MINIO_ACCESS_KEY=tempo
-      - MINIO_SECRET_KEY=supersecret
+      - AWS_ACCESS_KEY_ID=tempo
+      - AWS_SECRET_ACCESS_KEY=supersecret
     ports:
-      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ../shared/seaweedfs-entrypoint.sh:/entrypoint.sh
     entrypoint:
       - sh
-      - -euc
-      - mkdir -p /data/tempo && minio server /data --console-address ':9001'
+      - /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "wget --spider http://127.0.0.1:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   k6-tracing:
     image: ghcr.io/grafana/xk6-client-tracing:v0.0.9
