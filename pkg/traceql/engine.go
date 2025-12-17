@@ -50,9 +50,27 @@ func (e *Engine) ExecuteSearch(ctx context.Context, searchReq *tempopb.SearchReq
 	ctx, span := tracer.Start(ctx, "traceql.Engine.ExecuteSearch")
 	defer span.End()
 
-	rootExpr, _, _, _, fetchSpansRequest, err := Compile(searchReq.Query)
-	if err != nil {
-		return nil, err
+	// this is a very dirty trick to cut some corners
+	// TODO: do it correctly
+	var rootExpr *RootExpr
+	var fetchSpansRequest *FetchSpansRequest
+	var err error
+	if IsSQLQuery(searchReq.Query) {
+		mockQuery := "{}"
+		rootExpr, _, _, _, _, err = Compile(mockQuery)
+		if err != nil {
+			panic("Welp, something went wrong with my mock " + err.Error())
+		}
+		req, err := SQLToFetchSpansRequest(searchReq.Query)
+		if err != nil {
+			return nil, err
+		}
+		fetchSpansRequest = &req
+	} else {
+		rootExpr, _, _, _, fetchSpansRequest, err = Compile(searchReq.Query)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Check for performance testing hints
@@ -94,37 +112,39 @@ func (e *Engine) ExecuteSearch(ctx context.Context, searchReq *tempopb.SearchReq
 
 	spansetsEvaluated := 0
 	// set up the expression evaluation as a filter to reduce data pulled
-	fetchSpansRequest.SecondPass = func(inSS *Spanset) ([]*Spanset, error) {
-		if len(inSS.Spans) == 0 {
-			return nil, nil
-		}
-
-		evalSS, err := rootExpr.Pipeline.evaluate([]*Spanset{inSS})
-		if err != nil {
-			span.RecordError(err, trace.WithAttributes(attribute.String("msg", "pipeline.evaluate")))
-			return nil, err
-		}
-
-		spansetsEvaluated++
-		if len(evalSS) == 0 {
-			return nil, nil
-		}
-
-		// reduce all evalSS to their max length to reduce meta data lookups
-		for i := range evalSS {
-			l := len(evalSS[i].Spans)
-			evalSS[i].AddAttribute(attributeMatched, NewStaticInt(l))
-
-			spansPerSpanSet := int(searchReq.SpansPerSpanSet)
-			if spansPerSpanSet == 0 {
-				spansPerSpanSet = DefaultSpansPerSpanSet
+	if fetchSpansRequest.SecondPass == nil {
+		fetchSpansRequest.SecondPass = func(inSS *Spanset) ([]*Spanset, error) {
+			if len(inSS.Spans) == 0 {
+				return nil, nil
 			}
-			if l > spansPerSpanSet {
-				evalSS[i].Spans = evalSS[i].Spans[:spansPerSpanSet]
-			}
-		}
 
-		return evalSS, nil
+			evalSS, err := rootExpr.Pipeline.evaluate([]*Spanset{inSS})
+			if err != nil {
+				span.RecordError(err, trace.WithAttributes(attribute.String("msg", "pipeline.evaluate")))
+				return nil, err
+			}
+
+			spansetsEvaluated++
+			if len(evalSS) == 0 {
+				return nil, nil
+			}
+
+			// reduce all evalSS to their max length to reduce meta data lookups
+			for i := range evalSS {
+				l := len(evalSS[i].Spans)
+				evalSS[i].AddAttribute(attributeMatched, NewStaticInt(l))
+
+				spansPerSpanSet := int(searchReq.SpansPerSpanSet)
+				if spansPerSpanSet == 0 {
+					spansPerSpanSet = DefaultSpansPerSpanSet
+				}
+				if l > spansPerSpanSet {
+					evalSS[i].Spans = evalSS[i].Spans[:spansPerSpanSet]
+				}
+			}
+
+			return evalSS, nil
+		}
 	}
 
 	fetchSpansResponse, err := spanSetFetcher.Fetch(ctx, *fetchSpansRequest)
