@@ -17,6 +17,7 @@
 /operations/jsonnet/microservices/test/vendor
 /pkg/traceql/y.output
 /tempo
+/tempo-cli
 /tempo-query
 /tempo-vulture
 /tempodb/encoding/benchmark_block
