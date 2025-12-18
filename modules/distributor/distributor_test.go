@@ -2299,7 +2299,11 @@ func (m singlePartitionRingReader) PartitionRing() *ring.PartitionRing {
 			0: {Id: 0, Tokens: []uint32{0}, State: ring.PartitionActive},
 		},
 	}
-	return ring.NewPartitionRing(desc)
+	r, err := ring.NewPartitionRing(desc)
+	if err != nil {
+		panic(err)
+	}
+	return r
 }
 
 func TestCheckForRateLimits(t *testing.T) {
