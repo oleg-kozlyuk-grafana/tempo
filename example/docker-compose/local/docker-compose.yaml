@@ -27,6 +27,8 @@ services:
       - ./tempo.yaml:/etc/tempo.yaml
       - ./overrides.yaml:/etc/overrides.yaml
       - ./tempo-data:/var/tempo
+    environment:
+      - TRANSLATOR_URL=http://sql:3000
     ports:
       - "14268:14268" # jaeger ingest
       - "3200:3200" # tempo
@@ -38,10 +40,26 @@ services:
       - init
       - memcached
 
+  sql:
+    image: sql-translator:latest
+    ports:
+      - 3001:3000
+
   k6-tracing:
     image: ghcr.io/grafana/xk6-client-tracing:v0.0.9
     environment:
       - ENDPOINT=tempo:4317
+    restart: always
+    depends_on:
+      - tempo
+
+  k6-tracing-custom:
+    image: ghcr.io/grafana/xk6-client-tracing:v0.0.9
+    environment:
+      - ENDPOINT=tempo:4317
+    volumes:
+      - ./k6-tracing.js:/k6-tracing.js
+    command: run /k6-tracing.js
     restart: always
     depends_on:
       - tempo
