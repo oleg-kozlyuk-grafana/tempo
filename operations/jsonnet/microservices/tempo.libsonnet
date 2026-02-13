@@ -12,6 +12,7 @@
 (import 'backend-worker.libsonnet') +
 (import 'vulture.libsonnet') +
 (import 'memcached.libsonnet') +
+(import 'redis.libsonnet') +
 (import 'multi-zone.libsonnet') +
 (import 'memberlist.libsonnet') +
 (import 'vertical-pod-autoscaler.libsonnet') +

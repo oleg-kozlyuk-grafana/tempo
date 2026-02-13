@@ -71,6 +71,8 @@
         service+:
           service.mixin.spec.withIpFamilies(['IPv6']),
       },
+      [if $._config.redis.enabled then 'redis_service']+:
+        service.mixin.spec.withIpFamilies(['IPv6']),
       tempo_config+:: {
         server+: {
           http_listen_address: '::0',

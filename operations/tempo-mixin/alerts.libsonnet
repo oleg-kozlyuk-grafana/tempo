@@ -365,6 +365,23 @@
           },
 
           {
+            alert: 'TempoRedisErrorsElevated',
+            expr: |||
+              sum(rate(tempo_rediscache_request_duration_seconds_count{status_code="500"}[5m])) by (cluster, namespace, name)
+              /
+              sum(rate(tempo_rediscache_request_duration_seconds_count{}[5m])) by (cluster, namespace, name) > 0.2
+            |||,
+            'for': '10m',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              message: 'Tempo redis error rate is {{ printf "%0.2f" $value }} for role {{ $labels.name }} in {{ $labels.cluster }}/{{ $labels.namespace }}.',
+              runbook_url: 'https://github.com/grafana/tempo/tree/main/operations/tempo-mixin/runbook.md#TempoRedisErrorsElevated',
+            },
+          },
+
+          {
             alert: 'TempoBlockBuildersPartitionsMismatch',
             expr: |||
               max(tempo_partition_ring_partitions{name=~"livestore-partitions", state=~"Active|Inactive"}) by (namespace,cluster)

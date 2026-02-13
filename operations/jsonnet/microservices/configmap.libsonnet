@@ -36,8 +36,12 @@
         pool: {
           queue_depth: 2000,
         },
-        cache: 'memcached',
-        memcached: {
+        cache: if $._config.redis.enabled then 'redis' else 'memcached',
+        [if $._config.redis.enabled then 'redis']: {
+          endpoint: 'redis:6379',
+          timeout: '200ms',
+        },
+        [if !$._config.redis.enabled then 'memcached']: {
           consistent_hash: true,
           timeout: '200ms',
           host: 'memcached',

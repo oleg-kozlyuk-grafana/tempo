@@ -15,6 +15,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// Redis default max value size is 512MB.
+const redisMaxItemSize = 512 * 1024 * 1024
+
 // RedisCache type caches chunks in redis
 type RedisCache struct {
 	name            string
@@ -60,6 +63,13 @@ func redisStatusCode(err error) string {
 
 // Fetch gets keys from the cache. The keys that are found must be in the order of the keys requested.
 func (c *RedisCache) Fetch(ctx context.Context, keys []string) (found []string, bufs [][]byte, missed []string) {
+	select {
+	case <-ctx.Done():
+		missed = keys
+		return
+	default:
+	}
+
 	const method = "RedisCache.MGet"
 	var items [][]byte
 	// Run a tracked request, using c.requestDuration to monitor requests.
@@ -81,7 +91,11 @@ func (c *RedisCache) Fetch(ctx context.Context, keys []string) (found []string, 
 	for i, key := range keys {
 		if items[i] != nil {
 			found = append(found, key)
-			bufs = append(bufs, items[i])
+			// Copy into pooled buffer to avoid holding reference to redis response string
+			buf := cacheBufAllocator.pool.Get(len(items[i]))
+			buf = buf[:len(items[i])]
+			copy(buf, items[i])
+			bufs = append(bufs, buf)
 		} else {
 			missed = append(missed, key)
 		}
@@ -90,8 +104,14 @@ func (c *RedisCache) Fetch(ctx context.Context, keys []string) (found []string, 
 	return
 }
 
-// Fetch gets a single keys from the cache
+// FetchKey gets a single key from the cache
 func (c *RedisCache) FetchKey(ctx context.Context, key string) (buf []byte, found bool) {
+	select {
+	case <-ctx.Done():
+		return nil, false
+	default:
+	}
+
 	const method = "RedisCache.Get"
 	// Run a tracked request, using c.requestDuration to monitor requests.
 	err := measureRequest(ctx, method, c.requestDuration, redisStatusCode, func(ctx context.Context) error {
@@ -115,14 +135,26 @@ func (c *RedisCache) FetchKey(ctx context.Context, key string) (buf []byte, foun
 		return buf, false
 	}
 
-	return buf, true
+	// Copy into pooled buffer to avoid holding reference to redis response string
+	pooled := cacheBufAllocator.pool.Get(len(buf))
+	pooled = pooled[:len(buf)]
+	copy(pooled, buf)
+
+	return pooled, true
 }
 
 // Store stores the key in the cache.
 func (c *RedisCache) Store(ctx context.Context, keys []string, bufs [][]byte) {
-	err := c.redis.MSet(ctx, keys, bufs)
-	if err != nil {
-		level.Error(c.logger).Log("msg", "failed to put to redis", "name", c.name, "err", err)
+	for i := range keys {
+		if len(bufs[i]) > redisMaxItemSize {
+			level.Warn(c.logger).Log("msg", "skipping store, item too large", "name", c.name, "key", keys[i], "size", len(bufs[i]), "max", redisMaxItemSize)
+			continue
+		}
+
+		err := c.redis.MSet(ctx, keys[i:i+1], bufs[i:i+1])
+		if err != nil {
+			level.Error(c.logger).Log("msg", "failed to put to redis", "name", c.name, "err", err)
+		}
 	}
 }
 
@@ -131,11 +163,10 @@ func (c *RedisCache) Stop() {
 	_ = c.redis.Close()
 }
 
-func (c *RedisCache) Release(_ []byte) {
-	// buffer pooling unimplemented in redis
+func (c *RedisCache) Release(buf []byte) {
+	cacheBufAllocator.Put(&buf)
 }
 
-// redis doesn't have a max item size. todo: add
 func (c *RedisCache) MaxItemSize() int {
-	return 0
+	return redisMaxItemSize
 }

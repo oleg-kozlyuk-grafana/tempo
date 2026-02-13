@@ -57,6 +57,59 @@ func TestRedisCache(t *testing.T) {
 	assert.False(t, foundKey)
 }
 
+func TestRedisCacheMaxItemSize(t *testing.T) {
+	c, err := mockRedisCache()
+	require.NoError(t, err)
+	defer c.redis.Close()
+
+	require.Equal(t, redisMaxItemSize, c.MaxItemSize())
+}
+
+func TestRedisCacheRelease(t *testing.T) {
+	// Get a buffer from the pool, write data, release it back
+	buf := cacheBufAllocator.pool.Get(100)
+	buf = buf[:100]
+	for i := range buf {
+		buf[i] = byte(i)
+	}
+
+	c, err := mockRedisCache()
+	require.NoError(t, err)
+	defer c.redis.Close()
+
+	// Release should not panic
+	c.Release(buf)
+}
+
+func TestRedisCacheFetchContextCancellation(t *testing.T) {
+	c, err := mockRedisCache()
+	require.NoError(t, err)
+	defer c.redis.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	keys := []string{"key1", "key2"}
+	found, bufs, missed := c.Fetch(ctx, keys)
+
+	require.Empty(t, found)
+	require.Empty(t, bufs)
+	require.Equal(t, keys, missed)
+}
+
+func TestRedisCacheFetchKeyContextCancellation(t *testing.T) {
+	c, err := mockRedisCache()
+	require.NoError(t, err)
+	defer c.redis.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	buf, found := c.FetchKey(ctx, "key1")
+	require.Nil(t, buf)
+	require.False(t, found)
+}
+
 func mockRedisCache() (*RedisCache, error) {
 	redisServer, err := miniredis.Run()
 	if err != nil {

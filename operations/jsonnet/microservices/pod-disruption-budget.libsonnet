@@ -72,6 +72,13 @@
       },
     },
 
+    redis+: {
+      pdb: {
+        enabled: false,
+        max_unavailable: 1,
+      },
+    },
+
   },
 
   pdbForController(controller, configKey)::
