@@ -10,12 +10,12 @@
     container.withPorts([containerPort.new('redis', 6379)]) +
     container.withArgs([
       '--maxmemory',
-      '%dm' % $._config.redis.maxmemory_mb,
+      $._config.redis.maxmemory,
       '--maxmemory-policy',
       $._config.redis.maxmemory_policy,
     ]) +
-    $.util.resourcesRequests('500m', '%dMi' % std.ceil($._config.redis.maxmemory_mb * 1.2)) +
-    $.util.resourcesLimits('3', '%dMi' % std.ceil($._config.redis.maxmemory_mb * 1.5)),
+    $.util.resourcesRequests('1', '4Gi') +
+    $.util.resourcesLimits('2', '6Gi'),
 
   redis_exporter::
     container.new('exporter', $._images.redisExporter) +
@@ -37,10 +37,6 @@
     if $._config.redis.enabled then
       k.util.serviceFor($.redis_statefulset) +
       service.mixin.spec.withClusterIp('None'),
-
-  redis_vpa:
-    if $._config.redis.enabled then
-      $.vpaForController($.redis_statefulset, 'redis'),
 
   redis_pdb:
     if $._config.redis.enabled then

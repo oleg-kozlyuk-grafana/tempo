@@ -179,7 +179,7 @@
     redis: {
       enabled: false,
       replicas: 3,
-      maxmemory_mb: 1024,
+      maxmemory: '4gb',
       maxmemory_policy: 'allkeys-lfu',
     },
     jaeger_ui: {

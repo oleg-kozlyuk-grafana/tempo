@@ -133,19 +133,6 @@
       },
     },
 
-    redis+: {
-      vpa: {
-        enabled: false,
-        update_mode: 'Auto',
-        target_resources: ['cpu'],
-
-        cpu: {
-          min: '10m',
-          max: '2',
-        },
-      },
-    },
-
   },
 
   local vpa = import 'github.com/jsonnet-libs/vertical-pod-autoscaler-libsonnet/1.0.0/main.libsonnet',
