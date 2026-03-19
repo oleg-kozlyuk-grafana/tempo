@@ -1,6 +1,7 @@
 package livestore
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,9 +58,20 @@ func (s *LiveStore) startAllBackgroundProcesses() {
 }
 
 func (s *LiveStore) stopAllBackgroundProcesses() {
-	s.cancel()              // this will cause the per tenant background processes to complete
-	s.completeQueues.Stop() // this will cause the global complete loop by preventing additional enqueues
-	s.wg.Wait()
+	s.completeQueues.Stop() // workers drain remaining items then exit
+	s.cancel()              // per-tenant cut/cleanup loops exit
+
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Minute):
+		level.Warn(s.logger).Log("msg", "timed out waiting for background processes to stop")
+	}
 }
 
 func (s *LiveStore) runInBackground(fn func()) {
@@ -91,6 +103,8 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 			continue
 		}
 
+		level.Info(s.logger).Log("msg", "completing block", "tenant", op.tenantID, "op", op.id, "traces", len(op.traces), "attempt", op.attempts)
+
 		start := time.Now()
 		inst, err := s.getOrCreateInstance(op.tenantID)
 		if err != nil {
@@ -99,12 +113,16 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 			return
 		}
 
-		_, err = inst.completeBlock(s.ctx, op.traces)
+		// Use a dedicated context with timeout so that block completions are not
+		// killed by the service-lifecycle context (s.ctx) during shutdown.
+		blockCtx, blockCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		_, err = inst.completeBlock(blockCtx, op.traces)
+		blockCancel()
 		duration := time.Since(start)
 		metricCompletionDuration.Observe(duration.Seconds())
 
 		if err != nil {
-			level.Error(s.logger).Log("msg", "failed to complete block", "tenant", op.tenantID, "op", op.id, "err", err)
+			level.Error(s.logger).Log("msg", "failed to complete block", "tenant", op.tenantID, "op", op.id, "err", err, "duration", duration)
 			observeFailedOp(op)
 
 			delay := op.backoff()
@@ -123,9 +141,11 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 			// Commit the Kafka offset after successful block completion so the block
 			// acts as the durability checkpoint.
 			if op.kafkaOffset != nil {
-				if err := s.reader.commitNow(s.ctx, *op.kafkaOffset); err != nil {
+				commitCtx, commitCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				if err := s.reader.commitNow(commitCtx, *op.kafkaOffset); err != nil {
 					level.Error(s.logger).Log("msg", "failed to commit kafka offset after block completion", "tenant", op.tenantID, "offset", op.kafkaOffset.At, "err", err)
 				}
+				commitCancel()
 			}
 			metricBlocksCompleted.Inc()
 			s.completeQueues.Clear(op)
@@ -202,7 +222,7 @@ func (s *LiveStore) enqueueOp(op *completeOp) error {
 		return fmt.Errorf("complete queues are stopped, cannot enqueue operation %s", op.id.String())
 	}
 
-	level.Debug(s.logger).Log("msg", "enqueueing complete op", "tenant", op.tenantID, "op", op.id, "attempts", op.attempts)
+	level.Info(s.logger).Log("msg", "enqueueing complete op", "tenant", op.tenantID, "op", op.id, "attempts", op.attempts)
 	return s.completeQueues.Enqueue(op)
 }
 

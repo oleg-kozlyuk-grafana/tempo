@@ -404,8 +404,9 @@ func (s *LiveStore) stopping(error) error {
 	// Reset lag metrics for our partition when stopping
 	ingest.ResetLagMetricsForRevokedPartitions(s.cfg.IngestConfig.Kafka.ConsumerGroup, []int32{s.ingestPartitionID})
 
-	// Flush all data to disk
-	s.cutAllInstances()
+	// Flush remaining data synchronously — don't enqueue because
+	// stopAllBackgroundProcesses will shut down the workers shortly.
+	s.flushAllInstancesSync()
 
 	// Remove the shutdown marker if it exists since we are shutting down
 	shutdownMarkerPath := shutdownmarker.GetPath(s.cfg.ShutdownMarkerDir)
@@ -664,6 +665,41 @@ func (s *LiveStore) cutAllInstances() {
 
 	for _, instance := range instances {
 		s.cutOneInstance(instance, true)
+	}
+}
+
+// flushAllInstancesSync cuts and completes all remaining trace buffers synchronously.
+// Used during shutdown so we don't depend on background workers that are about to be stopped.
+func (s *LiveStore) flushAllInstancesSync() {
+	for _, inst := range s.getInstances() {
+		if err := inst.cutIdleTraces(true); err != nil {
+			level.Error(s.logger).Log("msg", "failed to cut idle traces during shutdown", "tenant", inst.tenantID, "err", err)
+			continue
+		}
+
+		traces := inst.cutBlocks(true)
+		if traces == nil {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		blockID, err := inst.completeBlock(ctx, traces)
+		cancel()
+		if err != nil {
+			level.Error(s.logger).Log("msg", "failed to complete block during shutdown", "tenant", inst.tenantID, "err", err)
+			continue
+		}
+
+		level.Info(s.logger).Log("msg", "completed block during shutdown", "tenant", inst.tenantID, "block", blockID)
+
+		// Commit offset after successful block write
+		if offset := s.reader.currentOffset(); offset != nil {
+			commitCtx, commitCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			if err := s.reader.commitNow(commitCtx, *offset); err != nil {
+				level.Error(s.logger).Log("msg", "failed to commit offset during shutdown", "tenant", inst.tenantID, "err", err)
+			}
+			commitCancel()
+		}
 	}
 }
 
