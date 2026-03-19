@@ -52,8 +52,7 @@ type block interface {
 // blockFn defines a function that processes a single block
 type blockFn func(ctx context.Context, meta *backend.BlockMeta, b block) error
 
-// iterateBlocks provides a way to iterate over all blocks (head, wal, complete)
-// using concurrent processing with bounded concurrency.
+// iterateBlocks provides a way to iterate over complete blocks using concurrent processing.
 func (i *instance) iterateBlocks(ctx context.Context, reqStart, reqEnd time.Time, fn blockFn) error {
 	i.blocksMtx.RLock()
 	defer i.blocksMtx.RUnlock()
@@ -77,53 +76,7 @@ func (i *instance) iterateBlocks(ctx context.Context, reqStart, reqEnd time.Time
 		anyErr.Store(err)
 	}
 
-	if i.headBlock != nil {
-		meta := i.headBlock.BlockMeta()
-		if includeBlock(meta, reqStart, reqEnd) {
-			ctx, span := tracer.Start(ctx, "process.headBlock")
-			span.SetAttributes(attribute.String("blockID", meta.BlockID.String()))
-
-			if err := fn(ctx, meta, i.headBlock); err != nil {
-				handleErr(fmt.Errorf("processing head block (%s): %w", meta.BlockID, err))
-			}
-			span.End()
-		}
-	}
-
-	if err := anyErr.Load(); err != nil {
-		return err
-	}
-
 	wg := boundedwaitgroup.New(i.Cfg.QueryBlockConcurrency)
-
-	// Process wal blocks
-	for _, b := range i.walBlocks {
-		if ctx.Err() != nil {
-			continue
-		}
-
-		meta := b.BlockMeta()
-		if !includeBlock(meta, reqStart, reqEnd) {
-			continue
-		}
-
-		wg.Add(1)
-		go func(block common.WALBlock) {
-			defer wg.Done()
-
-			if ctx.Err() != nil {
-				return
-			}
-
-			ctx, span := tracer.Start(ctx, "process.walBlock")
-			span.SetAttributes(attribute.String("blockID", meta.BlockID.String()))
-			defer span.End()
-
-			if err := fn(ctx, meta, block); err != nil {
-				handleErr(fmt.Errorf("processing wal block (%s): %w", meta.BlockID, err))
-			}
-		}(b)
-	}
 
 	// Process complete blocks
 	for _, b := range i.completeBlocks {
@@ -610,6 +563,19 @@ func (i *instance) FindByTraceID(ctx context.Context, traceID []byte, allowParti
 	}
 	i.liveTracesMtx.Unlock()
 
+	// Check trace buffer (traces cut from liveTraces but not yet in a complete block)
+	i.blocksMtx.RLock()
+	for _, bt := range i.traceBuffer {
+		if bytes.Equal(bt.ID, traceID) {
+			if _, err := combiner.Consume(bt.Trace); err != nil {
+				i.blocksMtx.RUnlock()
+				return nil, fmt.Errorf("unable to consume buffered trace: %w", err)
+			}
+			break
+		}
+	}
+	i.blocksMtx.RUnlock()
+
 	search := func(ctx context.Context, _ *backend.BlockMeta, b block) error {
 		trace, err := b.FindTraceByID(ctx, traceID, searchOpts)
 		if err != nil {
@@ -652,17 +618,6 @@ func (i *instance) QueryRange(ctx context.Context, req *tempopb.QueryRangeReques
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	e := traceql.NewEngine()
-
-	// Compile the raw version of the query for head and wal blocks
-	// These aren't cached and we put them all into the same evaluator
-	// for efficiency.
-	// TODO MRD look into how to propagate unsafe query hints.
-	rawEval, err := e.CompileMetricsQueryRange(req, i.Cfg.Metrics.TimeOverlapCutoff, false)
-	if err != nil {
-		return nil, err
-	}
-
 	// This is a summation version of the query for complete blocks
 	// which can be cached. They are timeseries, so they need the job-level evaluator.
 	jobEval, err := traceql.NewEngine().CompileMetricsQueryRangeNonRaw(req, traceql.AggregateModeSum)
@@ -692,32 +647,21 @@ func (i *instance) QueryRange(ctx context.Context, req *tempopb.QueryRangeReques
 	maxSeriesReached.Store(false)
 
 	search := func(ctx context.Context, _ *backend.BlockMeta, b block) error {
-		if walBlock, ok := b.(common.WALBlock); ok {
-			err := i.queryRangeWALBlock(ctx, walBlock, rawEval, maxSeries)
-			if err != nil {
-				return err
-			}
-			if maxSeries > 0 && rawEval.Length() > maxSeries {
-				maxSeriesReached.Store(true)
-				return errComplete
-			}
-			return nil
+		localBlock, ok := b.(*ingester.LocalBlock)
+		if !ok {
+			return fmt.Errorf("unexpected block type: %T", b)
 		}
 
-		if localBlock, ok := b.(*ingester.LocalBlock); ok {
-			resp, err := i.queryRangeCompleteBlock(ctx, localBlock, *req, timeOverlapCutoff, unsafe)
-			if err != nil {
-				return err
-			}
-			jobEval.ObserveSeries(resp)
-			if maxSeries > 0 && jobEval.Length() > maxSeries {
-				maxSeriesReached.Store(true)
-				return errComplete
-			}
-			return nil
+		resp, err := i.queryRangeCompleteBlock(ctx, localBlock, *req, timeOverlapCutoff, unsafe)
+		if err != nil {
+			return err
 		}
-
-		return fmt.Errorf("unexpected block type: %T", b)
+		jobEval.ObserveSeries(resp)
+		if maxSeries > 0 && jobEval.Length() > maxSeries {
+			maxSeriesReached.Store(true)
+			return errComplete
+		}
+		return nil
 	}
 
 	err = i.iterateBlocks(ctx, time.Unix(0, int64(req.Start)), time.Unix(0, int64(req.End)), search)
@@ -725,10 +669,6 @@ func (i *instance) QueryRange(ctx context.Context, req *tempopb.QueryRangeReques
 		level.Error(i.logger).Log("msg", "error in QueryRange", "err", err)
 		return nil, err
 	}
-
-	// Combine the raw results into the job results
-	walResults := rawEval.Results().ToProto(req)
-	jobEval.ObserveSeries(walResults)
 
 	r := jobEval.Results()
 	rr := r.ToProto(req)
@@ -745,24 +685,6 @@ func (i *instance) QueryRange(ctx context.Context, req *tempopb.QueryRangeReques
 	}, nil
 }
 
-func (i *instance) queryRangeWALBlock(ctx context.Context, b common.WALBlock, eval *traceql.MetricsEvaluator, maxSeries int) error {
-	m := b.BlockMeta()
-	ctx, span := tracer.Start(ctx, "instance.QueryRange.WALBlock", oteltrace.WithAttributes(
-		attribute.String("block", m.BlockID.String()),
-		attribute.Int64("blockSize", int64(m.Size_)),
-	))
-	defer span.End()
-
-	fetcher := traceql.NewSpansetFetcherWrapperBoth(
-		func(ctx context.Context, req traceql.FetchSpansRequest) (traceql.FetchSpansResponse, error) {
-			return b.Fetch(ctx, req, common.DefaultSearchOptions())
-		},
-		func(ctx context.Context, req traceql.FetchSpansRequest) (traceql.FetchSpansOnlyResponse, error) {
-			return b.FetchSpans(ctx, req, common.DefaultSearchOptions())
-		},
-	)
-	return eval.Do(ctx, fetcher, uint64(m.StartTime.UnixNano()), uint64(m.EndTime.UnixNano()), maxSeries)
-}
 
 func (i *instance) queryRangeCompleteBlock(ctx context.Context, b *ingester.LocalBlock, req tempopb.QueryRangeRequest, timeOverlapCutoff float64, unsafe bool) ([]*tempopb.TimeSeries, error) {
 	m := b.BlockMeta()
@@ -831,7 +753,7 @@ func (i *instance) queryRangeCacheGet(ctx context.Context, m *backend.BlockMeta,
 	name := fmt.Sprintf("cache_query_range_%v.buf", hash)
 
 	keyPath := backend.KeyPathForBlock((uuid.UUID)(m.BlockID), m.TenantID)
-	reader, size, err := i.wal.LocalBackend().Read(ctx, name, keyPath, nil)
+	reader, size, err := i.localBackend.Read(ctx, name, keyPath, nil)
 	if err != nil {
 		if errors.Is(err, backend.ErrDoesNotExist) {
 			// Not cached, but return the name/keypath so it can be set after
@@ -862,7 +784,7 @@ func (i *instance) queryRangeCacheSet(ctx context.Context, m *backend.BlockMeta,
 	}
 
 	keyPath := backend.KeyPathForBlock((uuid.UUID)(m.BlockID), m.TenantID)
-	return i.wal.LocalBackend().Write(ctx, name, keyPath, bytes.NewReader(data), int64(len(data)), nil)
+	return i.localBackend.Write(ctx, name, keyPath, bytes.NewReader(data), int64(len(data)), nil)
 }
 
 func queryRangeHashForBlock(req tempopb.QueryRangeRequest) uint64 {

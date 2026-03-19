@@ -15,15 +15,13 @@ import (
 	"github.com/grafana/tempo/modules/ingester"
 	"github.com/grafana/tempo/modules/overrides"
 	"github.com/grafana/tempo/pkg/livetraces"
-	"github.com/grafana/tempo/pkg/model"
 	"github.com/grafana/tempo/pkg/tempopb"
 	v1 "github.com/grafana/tempo/pkg/tempopb/trace/v1"
 	"github.com/grafana/tempo/pkg/tracesizes"
 	util_log "github.com/grafana/tempo/pkg/util/log"
 	"github.com/grafana/tempo/tempodb/backend"
+	"github.com/grafana/tempo/tempodb/backend/local"
 	"github.com/grafana/tempo/tempodb/encoding"
-	"github.com/grafana/tempo/tempodb/encoding/common"
-	"github.com/grafana/tempo/tempodb/wal"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -35,7 +33,6 @@ import (
 const (
 	traceDataType              = "trace"
 	reasonWaitingForLiveTraces = "waiting_for_live_traces"
-	reasonWaitingForWAL        = "waiting_for_wal"
 	maxTraceLogLinesPerSecond  = 10
 )
 
@@ -80,6 +77,14 @@ var (
 	}, []string{"reason"})
 )
 
+// bufferedTrace holds a cut trace waiting to be written to a complete block.
+type bufferedTrace struct {
+	ID        []byte
+	Trace     *tempopb.Trace
+	StartSecs uint32
+	EndSecs   uint32
+}
+
 type instance struct {
 	tenantID string
 	logger   log.Logger
@@ -87,16 +92,16 @@ type instance struct {
 	// Configuration
 	Cfg Config
 
-	// WAL and encoding
-	wal                   *wal.WAL
+	// Local backend for complete block storage
+	localBackend          *local.Backend
 	completeBlockEncoding encoding.VersionedEncoding
 
-	// Block management
-	blocksMtx      sync.RWMutex
-	headBlock      common.WALBlock
-	walBlocks      map[uuid.UUID]common.WALBlock
-	completeBlocks map[uuid.UUID]*ingester.LocalBlock
-	lastCutTime    time.Time
+	// Block management — blocksMtx also protects traceBuffer
+	blocksMtx        sync.RWMutex
+	traceBuffer      []*bufferedTrace
+	traceBufferBytes uint64
+	traceBufferStart time.Time
+	completeBlocks   map[uuid.UUID]*ingester.LocalBlock
 
 	// Live traces
 	liveTracesMtx  sync.Mutex
@@ -111,16 +116,15 @@ type instance struct {
 	overrides overrides.Interface
 }
 
-func newInstance(instanceID string, cfg Config, wal *wal.WAL, completeBlockEncoding encoding.VersionedEncoding, overrides overrides.Interface, logger log.Logger) (*instance, error) {
+func newInstance(instanceID string, cfg Config, localBackend *local.Backend, completeBlockEncoding encoding.VersionedEncoding, overrides overrides.Interface, logger log.Logger) (*instance, error) {
 	logger = log.With(logger, "tenant", instanceID)
 
 	i := &instance{
 		tenantID:              instanceID,
 		logger:                logger,
 		Cfg:                   cfg,
-		wal:                   wal,
+		localBackend:          localBackend,
 		completeBlockEncoding: completeBlockEncoding,
-		walBlocks:             map[uuid.UUID]common.WALBlock{},
 		completeBlocks:        map[uuid.UUID]*ingester.LocalBlock{},
 		liveTraces:            livetraces.New[*v1.ResourceSpans](func(rs *v1.ResourceSpans) uint64 { return uint64(rs.Size()) }, cfg.MaxTraceIdle, cfg.MaxTraceLive, instanceID),
 		traceSizes:            tracesizes.New(),
@@ -128,12 +132,6 @@ func newInstance(instanceID string, cfg Config, wal *wal.WAL, completeBlockEncod
 		overrides:             overrides,
 		tracesCreatedTotal:    metricTracesCreatedTotal.WithLabelValues(instanceID),
 		bytesReceivedTotal:    metricBytesReceivedTotal,
-		// blockOffsetMeta:   make(map[uuid.UUID]offsetMetadata),
-	}
-
-	err := i.resetHeadBlock()
-	if err != nil {
-		return nil, err
 	}
 
 	return i, nil
@@ -147,8 +145,7 @@ func (i *instance) backpressure(ctx context.Context) bool {
 		i.liveTracesMtx.Unlock()
 
 		if sz >= i.Cfg.MaxLiveTracesBytes {
-			// Live traces exceeds the expected amount of data in per wal flush,
-			// so wait a bit.
+			// Live traces exceeds the expected amount of data per flush, so wait a bit.
 			select {
 			case <-ctx.Done():
 				return false
@@ -158,24 +155,6 @@ func (i *instance) backpressure(ctx context.Context) bool {
 			metricBackPressure.WithLabelValues(reasonWaitingForLiveTraces).Inc()
 			return true
 		}
-	}
-
-	// Check outstanding wal blocks
-	i.blocksMtx.RLock()
-	count := len(i.walBlocks)
-	i.blocksMtx.RUnlock()
-
-	if count > 1 {
-		// There are multiple outstanding WAL blocks that need completion
-		// so wait a bit.
-		select {
-		case <-ctx.Done():
-			return false
-		case <-time.After(1 * time.Second):
-		}
-
-		metricBackPressure.WithLabelValues(reasonWaitingForWAL).Inc()
-		return true
 	}
 
 	return false
@@ -278,82 +257,70 @@ func (i *instance) cutIdleTraces(immediate bool) error {
 	if len(tracesToCut) == 0 {
 		return nil
 	}
+
 	// Sort by ID
 	sort.Slice(tracesToCut, func(i, j int) bool {
 		return bytes.Compare(tracesToCut[i].ID, tracesToCut[j].ID) == -1
 	})
-	// Collect the trace IDs that will be flushed
+
+	i.blocksMtx.Lock()
+	defer i.blocksMtx.Unlock()
+
 	for _, t := range tracesToCut {
-		err := i.writeHeadBlock(t.ID, t)
-		if err != nil {
-			return err
+		tr := &tempopb.Trace{
+			ResourceSpans: t.Batches,
+		}
+
+		// Get trace timestamp bounds
+		var start, end uint64
+		for _, batch := range tr.ResourceSpans {
+			for _, ss := range batch.ScopeSpans {
+				for _, s := range ss.Spans {
+					if start == 0 || s.StartTimeUnixNano < start {
+						start = s.StartTimeUnixNano
+					}
+					if s.EndTimeUnixNano > end {
+						end = s.EndTimeUnixNano
+					}
+				}
+			}
+		}
+
+		// Convert from unix nanos to unix seconds
+		startSeconds := uint32(start / uint64(time.Second))
+		endSeconds := uint32(end / uint64(time.Second))
+
+		// Constrain start/end with ingestion slack calculated off of liveTrace.createdAt and lastAppend.
+		// createdAt and lastAppend are set via the record.Timestamp from kafka so they are "time.Now()" for the
+		// ingestion of this trace.
+		slackDuration := i.Cfg.WAL.IngestionSlack
+		minStart := uint32(t.CreatedAt.Add(-slackDuration).Unix())
+		maxEnd := uint32(t.LastAppend.Add(slackDuration).Unix())
+
+		if startSeconds < minStart {
+			startSeconds = minStart
+		}
+		if endSeconds > maxEnd {
+			endSeconds = maxEnd
+		}
+
+		i.traceBuffer = append(i.traceBuffer, &bufferedTrace{
+			ID:        t.ID,
+			Trace:     tr,
+			StartSecs: startSeconds,
+			EndSecs:   endSeconds,
+		})
+		i.traceBufferBytes += uint64(tr.Size())
+
+		// Track when the buffer started filling for MaxBlockDuration check
+		if len(i.traceBuffer) == 1 {
+			i.traceBufferStart = time.Now()
 		}
 
 		i.tracesCreatedTotal.Inc()
 	}
 
-	i.blocksMtx.Lock()
-	defer i.blocksMtx.Unlock()
-	if i.headBlock != nil {
-		err := i.headBlock.Flush()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
 	return nil
-}
-
-func (i *instance) writeHeadBlock(id []byte, liveTrace *livetraces.LiveTrace[*v1.ResourceSpans]) error {
-	i.blocksMtx.Lock()
-	defer i.blocksMtx.Unlock()
-
-	if i.headBlock == nil {
-		err := i.resetHeadBlock()
-		if err != nil {
-			return err
-		}
-	}
-
-	tr := &tempopb.Trace{
-		ResourceSpans: liveTrace.Batches,
-	}
-
-	// Get trace timestamp bounds
-	var start, end uint64
-	for _, batch := range tr.ResourceSpans {
-		for _, ss := range batch.ScopeSpans {
-			for _, s := range ss.Spans {
-				if start == 0 || s.StartTimeUnixNano < start {
-					start = s.StartTimeUnixNano
-				}
-				if s.EndTimeUnixNano > end {
-					end = s.EndTimeUnixNano
-				}
-			}
-		}
-	}
-
-	// Convert from unix nanos to unix seconds
-	startSeconds := uint32(start / uint64(time.Second))
-	endSeconds := uint32(end / uint64(time.Second))
-
-	// constrain start/end with ingestion slack calculated off of liveTrace.createdAt and lastAppend
-	// createdAt and lastAppend are set via the record.Timestamp from kafka so they are "time.Now()" for the
-	// ingestion of this trace
-	slackDuration := i.Cfg.WAL.IngestionSlack
-	minStart := uint32(liveTrace.CreatedAt.Add(-slackDuration).Unix())
-	maxEnd := uint32(liveTrace.LastAppend.Add(slackDuration).Unix())
-
-	if startSeconds < minStart {
-		startSeconds = minStart
-	}
-	if endSeconds > maxEnd {
-		endSeconds = maxEnd
-	}
-
-	return i.headBlock.AppendTrace(id, tr, startSeconds, endSeconds, false)
 }
 
 func (i *instance) getDedicatedColumns() backend.DedicatedColumns {
@@ -368,132 +335,107 @@ func (i *instance) getDedicatedColumns() backend.DedicatedColumns {
 	return i.Cfg.BlockConfig.DedicatedColumns
 }
 
-func (i *instance) resetHeadBlock() error {
-	dedicatedColumns := i.getDedicatedColumns()
-
-	meta := &backend.BlockMeta{
-		BlockID:           backend.NewUUID(),
-		TenantID:          i.tenantID,
-		DedicatedColumns:  dedicatedColumns,
-		ReplicationFactor: backend.LiveStoreReplicationFactor,
-	}
-	block, err := i.wal.NewBlock(meta, model.CurrentEncoding)
-	if err != nil {
-		return err
-	}
-	i.headBlock = block
-	i.lastCutTime = time.Now()
-	return nil
-}
-
-func (i *instance) cutBlocks(immediate bool) (uuid.UUID, error) {
+// cutBlocks checks if the trace buffer should be flushed to a complete block.
+// When triggered it swaps out the buffer and returns it; the caller is responsible for
+// driving the completion. Returns nil when nothing should be cut yet.
+func (i *instance) cutBlocks(immediate bool) []*bufferedTrace {
 	i.blocksMtx.Lock()
 	defer i.blocksMtx.Unlock()
 
-	if i.headBlock == nil || i.headBlock.DataLength() == 0 {
-		return uuid.Nil, nil
-	}
-
-	if !immediate && time.Since(i.lastCutTime) < i.Cfg.MaxBlockDuration && i.headBlock.DataLength() < i.Cfg.MaxBlockBytes {
-		return uuid.Nil, nil
-	}
-
-	i.traceSizes.ClearIdle(i.lastCutTime)
-
-	// Final flush
-	err := i.headBlock.Flush()
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	id := (uuid.UUID)(i.headBlock.BlockMeta().BlockID)
-	blockSize := i.headBlock.DataLength()
-	i.walBlocks[id] = i.headBlock
-
-	level.Info(i.logger).Log("msg", "queueing wal block for completion", "block", id.String(), "size", blockSize)
-
-	err = i.resetHeadBlock()
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return id, nil
-}
-
-func (i *instance) completeBlock(ctx context.Context, id uuid.UUID) error {
-	ctx, span := tracer.Start(ctx, "instance.completeBlock",
-		oteltrace.WithAttributes(
-			attribute.String("tenant", i.tenantID),
-			attribute.String("blockID", id.String()),
-		))
-	defer span.End()
-
-	i.blocksMtx.Lock()
-	walBlock := i.walBlocks[id]
-	i.blocksMtx.Unlock()
-
-	if walBlock == nil {
-		level.Warn(i.logger).Log("msg", "WAL block disappeared before being completed", "id", id)
-		span.AddEvent("WAL block not found")
+	if len(i.traceBuffer) == 0 {
 		return nil
 	}
 
-	blockSize := walBlock.DataLength()
-	metricCompletionSize.Observe(float64(blockSize))
-	span.SetAttributes(attribute.Int64("block_size", int64(blockSize)))
-
-	// Create completed block
-	reader := backend.NewReader(i.wal.LocalBackend())
-	writer := backend.NewWriter(i.wal.LocalBackend())
-
-	iter, err := walBlock.Iterator()
-	if err != nil {
-		level.Error(i.logger).Log("msg", "failed to get WAL block iterator", "id", id, "err", err)
-		span.RecordError(err)
-		return err
+	if !immediate && time.Since(i.traceBufferStart) < i.Cfg.MaxBlockDuration && i.traceBufferBytes < i.Cfg.MaxBlockBytes {
+		return nil
 	}
+
+	i.traceSizes.ClearIdle(i.traceBufferStart)
+
+	// Swap out the buffer
+	traces := i.traceBuffer
+	bufferBytes := i.traceBufferBytes
+
+	i.traceBuffer = nil
+	i.traceBufferBytes = 0
+	i.traceBufferStart = time.Time{}
+
+	level.Info(i.logger).Log("msg", "queueing trace buffer for completion", "traces", len(traces), "bytes", bufferBytes)
+
+	return traces
+}
+
+func (i *instance) completeBlock(ctx context.Context, traces []*bufferedTrace) (uuid.UUID, error) {
+	if len(traces) == 0 {
+		return uuid.Nil, nil
+	}
+
+	// Compute block time bounds from buffered traces
+	var minStart, maxEnd uint32
+	var totalBytes uint64
+	for _, t := range traces {
+		if minStart == 0 || t.StartSecs < minStart {
+			minStart = t.StartSecs
+		}
+		if t.EndSecs > maxEnd {
+			maxEnd = t.EndSecs
+		}
+		totalBytes += uint64(t.Trace.Size())
+	}
+
+	blockID := backend.NewUUID()
+
+	ctx, span := tracer.Start(ctx, "instance.completeBlock",
+		oteltrace.WithAttributes(
+			attribute.String("tenant", i.tenantID),
+			attribute.String("blockID", blockID.String()),
+			attribute.Int("traces", len(traces)),
+		))
+	defer span.End()
+
+	metricCompletionSize.Observe(float64(totalBytes))
+	span.SetAttributes(attribute.Int64("total_bytes", int64(totalBytes)))
+
+	dedicatedColumns := i.getDedicatedColumns()
+	meta := &backend.BlockMeta{
+		BlockID:           blockID,
+		TenantID:          i.tenantID,
+		DedicatedColumns:  dedicatedColumns,
+		ReplicationFactor: backend.LiveStoreReplicationFactor,
+		StartTime:         time.Unix(int64(minStart), 0),
+		EndTime:           time.Unix(int64(maxEnd), 0),
+	}
+
+	reader := backend.NewReader(i.localBackend)
+	writer := backend.NewWriter(i.localBackend)
+
+	iter := newTraceBufferIter(traces)
 	defer iter.Close()
 
-	newMeta, err := i.completeBlockEncoding.CreateBlock(ctx, &i.Cfg.BlockConfig, walBlock.BlockMeta(), iter, reader, writer)
+	newMeta, err := i.completeBlockEncoding.CreateBlock(ctx, &i.Cfg.BlockConfig, meta, iter, reader, writer)
 	if err != nil {
-		level.Error(i.logger).Log("msg", "failed to create complete block", "id", id, "err", err)
+		level.Error(i.logger).Log("msg", "failed to create complete block", "blockID", blockID, "err", err)
 		span.RecordError(err)
-		return err
+		return uuid.Nil, err
 	}
 
 	newBlock, err := i.completeBlockEncoding.OpenBlock(newMeta, reader)
 	if err != nil {
-		level.Error(i.logger).Log("msg", "failed to open complete block", "id", id, "err", err)
+		level.Error(i.logger).Log("msg", "failed to open complete block", "blockID", blockID, "err", err)
 		span.RecordError(err)
-		return err
+		return uuid.Nil, err
 	}
+
+	id := (uuid.UUID)(newMeta.BlockID)
 
 	i.blocksMtx.Lock()
 	defer i.blocksMtx.Unlock()
 
-	// Verify the WAL block still exists
-	if _, ok := i.walBlocks[id]; !ok {
-		level.Warn(i.logger).Log("msg", "WAL block disappeared while being completed, deleting complete block", "id", id)
-		err := i.wal.LocalBackend().ClearBlock(id, i.tenantID)
-		if err != nil {
-			level.Error(i.logger).Log("msg", "failed to clear complete block after WAL disappeared", "block", id, "err", err)
-		}
-		span.AddEvent("WAL block disappeared during completion")
-		return nil
-	}
-
-	i.completeBlocks[id] = ingester.NewLocalBlock(ctx, newBlock, i.wal.LocalBackend())
-
-	err = walBlock.Clear()
-	if err != nil {
-		level.Error(i.logger).Log("msg", "failed to clear WAL block", "id", id, "err", err)
-		span.RecordError(err)
-	}
-	delete(i.walBlocks, (uuid.UUID)(walBlock.BlockMeta().BlockID))
+	i.completeBlocks[id] = ingester.NewLocalBlock(ctx, newBlock, i.localBackend)
 
 	level.Info(i.logger).Log("msg", "completed block", "id", id.String())
 	span.AddEvent("block completed successfully")
-	return nil
+	return id, nil
 }
 
 func (i *instance) deleteOldBlocks() error {
@@ -502,25 +444,10 @@ func (i *instance) deleteOldBlocks() error {
 
 	cutoff := time.Now().Add(-i.Cfg.CompleteBlockTimeout) // Delete blocks older than Complete Block Timeout
 
-	for id, walBlock := range i.walBlocks {
-		if walBlock.BlockMeta().EndTime.Before(cutoff) {
-			if _, ok := i.completeBlocks[id]; !ok {
-				level.Warn(i.logger).Log("msg", "deleting WAL block that was never completed", "block", id.String())
-			}
-			err := walBlock.Clear()
-			if err != nil {
-				return err
-			}
-			delete(i.walBlocks, id)
-			metricBlocksClearedTotal.WithLabelValues("wal").Inc()
-		}
-	}
-
 	for id, completeBlock := range i.completeBlocks {
 		if completeBlock.BlockMeta().EndTime.Before(cutoff) {
-
 			level.Info(i.logger).Log("msg", "deleting complete block", "block", id.String())
-			err := i.wal.LocalBackend().ClearBlock(id, i.tenantID)
+			err := i.localBackend.ClearBlock(id, i.tenantID)
 			if err != nil {
 				return err
 			}

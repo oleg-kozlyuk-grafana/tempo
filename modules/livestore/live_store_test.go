@@ -67,116 +67,31 @@ func TestLiveStoreFullBlockLifecycleCheating(t *testing.T) {
 
 	// in live traces
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 1, walBlocks: 0, completeBlocks: 0})
+	requireInstanceState(t, inst, instanceState{liveTraces: 1, traceBuffer: 0, completeBlocks: 0})
 
-	// cut to head block and test
+	// cut idle traces into the trace buffer
 	err = inst.cutIdleTraces(true)
 	require.NoError(t, err)
 
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireTraceInBlock(t, inst.headBlock, expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 0, completeBlocks: 0})
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 1, completeBlocks: 0})
 
-	// cut a new head block. old head block is in wal blocks
-	walUUID, err := inst.cutBlocks(true)
+	// cut trace buffer — returns buffered traces for completion
+	traces := inst.cutBlocks(true)
+	require.NotEmpty(t, traces)
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 0})
+
+	// complete the block from buffered traces
+	blockID, err := inst.completeBlock(t.Context(), traces)
 	require.NoError(t, err)
 
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireTraceInBlock(t, inst.walBlocks[walUUID], expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
-
-	// force complete the wal block
-	err = inst.completeBlock(t.Context(), walUUID)
-	require.NoError(t, err)
-
-	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireTraceInBlock(t, inst.completeBlocks[walUUID], expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 0, completeBlocks: 1})
+	requireTraceInBlock(t, inst.completeBlocks[blockID], expectedID, expectedTrace)
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 1})
 
 	// stop gracefully
 	err = services.StopAndAwaitTerminated(t.Context(), liveStore)
 	require.NoError(t, err)
-}
-
-func TestLiveStoreReplaysTraceInLiveTraces(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	liveStore, err := defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-	require.NotNil(t, liveStore)
-
-	// push data
-	expectedID, expectedTrace := pushToLiveStore(t, liveStore)
-
-	// stop the live store and then create a new one to simulate a restart and replay the data on disk
-	err = services.StopAndAwaitTerminated(t.Context(), liveStore)
-	require.NoError(t, err)
-
-	liveStore, err = defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-
-	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, liveStore.instances[testTenantID], instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
-}
-
-func TestLiveStoreReplaysTraceInHeadBlock(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	liveStore, err := defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-	require.NotNil(t, liveStore)
-
-	// push data
-	expectedID, expectedTrace := pushToLiveStore(t, liveStore)
-
-	inst, err := liveStore.getOrCreateInstance(testTenantID)
-	require.NoError(t, err)
-
-	// cut to head block
-	err = inst.cutIdleTraces(true)
-	require.NoError(t, err)
-
-	// stop the live store and then create a new one to simulate a restart and replay the data on disk
-	err = services.StopAndAwaitTerminated(t.Context(), liveStore)
-	require.NoError(t, err)
-
-	liveStore, err = defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-
-	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, liveStore.instances[testTenantID], instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
-}
-
-func TestLiveStoreReplaysTraceInWalBlocks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	liveStore, err := defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-	require.NotNil(t, liveStore)
-
-	// push data
-	expectedID, expectedTrace := pushToLiveStore(t, liveStore)
-
-	inst, err := liveStore.getOrCreateInstance(testTenantID)
-	require.NoError(t, err)
-
-	// cut to head block
-	err = inst.cutIdleTraces(true)
-	require.NoError(t, err)
-
-	// cut head to wal blocks
-	_, err = inst.cutBlocks(true)
-	require.NoError(t, err)
-
-	// stop the live store and then create a new one to simulate a restart and replay the data on disk
-	err = services.StopAndAwaitTerminated(t.Context(), liveStore)
-	require.NoError(t, err)
-
-	liveStore, err = defaultLiveStore(t, tmpDir)
-	require.NoError(t, err)
-
-	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, liveStore.instances[testTenantID], instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
 }
 
 func TestLiveStoreReplaysTraceInCompleteBlocks(t *testing.T) {
@@ -192,16 +107,14 @@ func TestLiveStoreReplaysTraceInCompleteBlocks(t *testing.T) {
 	inst, err := liveStore.getOrCreateInstance(testTenantID)
 	require.NoError(t, err)
 
-	// cut to head block
+	// cut to trace buffer
 	err = inst.cutIdleTraces(true)
 	require.NoError(t, err)
 
-	// cut head to wal blocks
-	walUUID, err := inst.cutBlocks(true)
-	require.NoError(t, err)
-
-	// complete the wal blocks
-	err = inst.completeBlock(t.Context(), walUUID)
+	// cut and complete
+	traces := inst.cutBlocks(true)
+	require.NotEmpty(t, traces)
+	_, err = inst.completeBlock(t.Context(), traces)
 	require.NoError(t, err)
 
 	// stop the live store and then create a new one to simulate a restart and replay the data on disk
@@ -212,7 +125,7 @@ func TestLiveStoreReplaysTraceInCompleteBlocks(t *testing.T) {
 	require.NoError(t, err)
 
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, liveStore.instances[testTenantID], instanceState{liveTraces: 0, walBlocks: 0, completeBlocks: 1})
+	requireInstanceState(t, liveStore.instances[testTenantID], instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 1})
 }
 
 func TestLiveStoreConsumeDropsOldRecords(t *testing.T) {
@@ -333,21 +246,17 @@ func TestLiveStoreUsesRecordTimestampForBlockStartAndEnd(t *testing.T) {
 		inst, err := ls.getOrCreateInstance(testTenantID)
 		require.NoError(t, err)
 
-		// force just pushed traces to the head block
+		// force just pushed traces to the trace buffer
 		err = inst.cutIdleTraces(true)
 		require.NoError(t, err)
 
-		meta := inst.headBlock.BlockMeta()
-		require.Equal(t, tc.expectedStart, meta.StartTime)
-		require.Equal(t, tc.expectedEnd, meta.EndTime)
-
-		// cut to complete block and test again
-		uuid, err := inst.cutBlocks(true)
-		require.NoError(t, err)
-		err = inst.completeBlock(t.Context(), uuid)
+		// cut and complete
+		traces := inst.cutBlocks(true)
+		require.NotEmpty(t, traces)
+		blockID, err := inst.completeBlock(t.Context(), traces)
 		require.NoError(t, err)
 
-		meta = inst.completeBlocks[uuid].BlockMeta()
+		meta := inst.completeBlocks[blockID].BlockMeta()
 		require.Equal(t, tc.expectedStart, meta.StartTime)
 		require.Equal(t, tc.expectedEnd, meta.EndTime)
 
@@ -374,7 +283,7 @@ func TestLiveStoreShutdownWithPendingCompletions(t *testing.T) {
 
 	// in live traces
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 1, walBlocks: 0, completeBlocks: 0})
+	requireInstanceState(t, inst, instanceState{liveTraces: 1, traceBuffer: 0, completeBlocks: 0})
 
 	require.NoError(t, liveStore.stopping(nil))
 }
@@ -625,24 +534,24 @@ func TestRequeueOnError(t *testing.T) {
 	// push data
 	expectedID, expectedTrace := pushToLiveStore(t, liveStore)
 	requireTraceInLiveStore(t, liveStore, expectedID, expectedTrace)
-	requireInstanceState(t, inst, instanceState{liveTraces: 1, walBlocks: 0, completeBlocks: 0})
+	requireInstanceState(t, inst, instanceState{liveTraces: 1, traceBuffer: 0, completeBlocks: 0})
 
-	// cut to wal and enqueue complete operation
-	liveStore.cutAllInstancesToWal()
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
+	// cut and enqueue complete operation (traces move from buffer into the completeOp queue)
+	liveStore.cutAllInstances()
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 0})
 
 	// wait for the first backoff that should not be successful
 	time.Sleep(initialBackoff * 2)
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 1, completeBlocks: 0})
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 0})
 	// now completeBlockEncoding does not error and block should be flushed successfully
 	enc.SetError(nil)
 	time.Sleep(initialBackoff * 8)
-	requireInstanceState(t, inst, instanceState{liveTraces: 0, walBlocks: 0, completeBlocks: 1})
+	requireInstanceState(t, inst, instanceState{liveTraces: 0, traceBuffer: 0, completeBlocks: 1})
 }
 
 type instanceState struct {
 	liveTraces     int
-	walBlocks      int
+	traceBuffer    int
 	completeBlocks int
 }
 
@@ -675,7 +584,9 @@ func createRecordIter(records []*kgo.Record) recordIter {
 
 func requireInstanceState(t *testing.T, inst *instance, state instanceState) {
 	require.Equal(t, uint64(state.liveTraces), inst.liveTraces.Len(), "live traces count mismatch")
-	require.Len(t, inst.walBlocks, state.walBlocks, "wal blocks count mismatch")
+	inst.blocksMtx.RLock()
+	require.Len(t, inst.traceBuffer, state.traceBuffer, "trace buffer count mismatch")
+	inst.blocksMtx.RUnlock()
 	require.Len(t, inst.completeBlocks, state.completeBlocks, "complete blocks count mismatch")
 }
 

@@ -26,73 +26,78 @@ const (
 	testPartition     = int32(0)
 )
 
-func TestPartitionReaderCommits(t *testing.T) {
-	t.Run("sync commits", func(t *testing.T) {
-		k, address := testkafka.CreateCluster(t, 1, testTopic)
+// TestPartitionReaderCommitNow verifies that commitNow commits the offset to Kafka.
+func TestPartitionReaderCommitNow(t *testing.T) {
+	k, address := testkafka.CreateCluster(t, 1, testTopic)
 
-		kafkaCommits := atomic.NewInt32(0)
-		k.ControlKey(kmsg.OffsetCommit, func(kmsg.Request) (kmsg.Response, error, bool) {
-			kafkaCommits.Inc()
-			return nil, nil, false
-		})
-
-		client := testkafka.NewKafkaClient(t, address, testTopic)
-		testkafka.SendReq(t.Context(), t, client, ingest.Encode, testTenantID)
-
-		consumeFn := func(_ context.Context, rs recordIter, _ time.Time) (*kadm.Offset, error) {
-			var lastRecord *kgo.Record
-			for !rs.Done() {
-				lastRecord = rs.Next()
-			}
-			offset := kadm.NewOffsetFromRecord(lastRecord)
-			return &offset, nil
-		}
-
-		// commitInterval=0 commits synchronously
-		r := defaultPartitionReaderWithCommitInterval(t, address, 0, consumeFn)
-
-		assert.Eventually(t, func() bool { return kafkaCommits.Load() >= 1 }, time.Second*2, 10*time.Millisecond)
-		assert.Equal(t, int64(0), r.lag.Load())
-
-		t.Cleanup(func() { require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r)) })
+	kafkaCommits := atomic.NewInt32(0)
+	k.ControlKey(kmsg.OffsetCommit, func(kmsg.Request) (kmsg.Response, error, bool) {
+		kafkaCommits.Inc()
+		return nil, nil, false
 	})
 
-	t.Run("async commits", func(t *testing.T) {
-		var asyncCommits atomic.Int32
+	client := testkafka.NewKafkaClient(t, address, testTopic)
+	testkafka.SendReq(t.Context(), t, client, ingest.Encode, testTenantID)
 
-		commitInterval := 5 * time.Second
-
-		k, address := testkafka.CreateCluster(t, 1, testTopic)
-		k.ControlKey(kmsg.OffsetCommit, func(kmsg.Request) (kmsg.Response, error, bool) {
-			asyncCommits.Inc()
-			return nil, nil, false
-		})
-
-		client := testkafka.NewKafkaClient(t, address, testTopic)
-		testkafka.SendReq(t.Context(), t, client, ingest.Encode, testTenantID)
-
-		consumed := make(chan struct{})
-		consumeFn := func(_ context.Context, rs recordIter, _ time.Time) (*kadm.Offset, error) {
-			defer close(consumed)
-			var lastRecord *kgo.Record
-			for !rs.Done() {
-				lastRecord = rs.Next()
-			}
-			offset := kadm.NewOffsetFromRecord(lastRecord)
-			return &offset, nil
+	consumed := make(chan kadm.Offset, 1)
+	consumeFn := func(_ context.Context, rs recordIter, _ time.Time) (*kadm.Offset, error) {
+		var lastRecord *kgo.Record
+		for !rs.Done() {
+			lastRecord = rs.Next()
 		}
+		offset := kadm.NewOffsetFromRecord(lastRecord)
+		consumed <- offset
+		return &offset, nil
+	}
 
-		r := defaultPartitionReaderWithCommitInterval(t, address, commitInterval, consumeFn)
+	r := defaultPartitionReader(t, address, consumeFn)
 
-		<-consumed                                     // Assert that record has been consumed
-		assert.Equal(t, asyncCommits.Load(), int32(0)) // Nothing committed
+	// Wait for consumption
+	offset := <-consumed
 
-		// Waiting up to commitInterval, a commit will have happened by then
-		assert.Eventually(t, func() bool { return asyncCommits.Load() >= 1 }, commitInterval*2, 10*time.Millisecond)
-		assert.Equal(t, int64(0), r.lag.Load())
+	// Before commitNow, nothing should have been committed
+	assert.Equal(t, int32(0), kafkaCommits.Load(), "no auto-commits should happen")
 
-		require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r))
+	// After commitNow, offset is committed
+	require.NoError(t, r.commitNow(t.Context(), offset))
+	assert.Eventually(t, func() bool { return kafkaCommits.Load() >= 1 }, time.Second*2, 10*time.Millisecond)
+	assert.Equal(t, int64(0), r.lag.Load())
+
+	t.Cleanup(func() { require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r)) })
+}
+
+// TestPartitionReaderNoAutoCommit verifies that consuming records does NOT trigger automatic commits.
+func TestPartitionReaderNoAutoCommit(t *testing.T) {
+	k, address := testkafka.CreateCluster(t, 1, testTopic)
+
+	kafkaCommits := atomic.NewInt32(0)
+	k.ControlKey(kmsg.OffsetCommit, func(kmsg.Request) (kmsg.Response, error, bool) {
+		kafkaCommits.Inc()
+		return nil, nil, false
 	})
+
+	client := testkafka.NewKafkaClient(t, address, testTopic)
+	testkafka.SendReq(t.Context(), t, client, ingest.Encode, testTenantID)
+
+	consumed := make(chan struct{})
+	consumeFn := func(_ context.Context, rs recordIter, _ time.Time) (*kadm.Offset, error) {
+		defer close(consumed)
+		var lastRecord *kgo.Record
+		for !rs.Done() {
+			lastRecord = rs.Next()
+		}
+		offset := kadm.NewOffsetFromRecord(lastRecord)
+		return &offset, nil
+	}
+
+	r := defaultPartitionReader(t, address, consumeFn)
+	defer func() { require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r)) }()
+
+	<-consumed // Record has been consumed
+
+	// Wait a bit and verify no auto-commits happened
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, int32(0), kafkaCommits.Load(), "consuming should not auto-commit")
 }
 
 func TestPartitionReaderLag(t *testing.T) {
@@ -115,8 +120,7 @@ func TestPartitionReaderLag(t *testing.T) {
 		return nil, errors.New("error consuming records")
 	}
 
-	// commitInterval=0 commits synchronously
-	r := defaultPartitionReaderWithCommitInterval(t, address, 0, consumeFn)
+	r := defaultPartitionReader(t, address, consumeFn)
 
 	client := testkafka.NewKafkaClient(t, address, testTopic)
 	records := 10
@@ -125,8 +129,8 @@ func TestPartitionReaderLag(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
-	assert.Equal(t, int32(1), kafkaCommits.Load(), "only one record should be committed")
-	assert.Equal(t, int64(records)-1, r.lag.Load(), "only one record should be committed")
+	assert.Equal(t, int32(0), kafkaCommits.Load(), "no auto-commits should happen")
+	assert.Equal(t, int64(records)-1, r.lag.Load(), "only one record should be in watermark")
 
 	t.Cleanup(func() { require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r)) })
 }
@@ -161,7 +165,7 @@ func TestFetchLastCommittedOffsetForceFromLookback(t *testing.T) {
 		readerClient, err := ingest.NewReaderClient(cfg, ingest.NewReaderClientMetrics(liveStoreServiceName, prometheus.NewRegistry()), l)
 		require.NoError(t, err)
 
-		r, err := newPartitionReader(readerClient, testPartition, cfg, 0, lookback, false, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
+		r, err := newPartitionReader(readerClient, testPartition, cfg, lookback, false, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
 		require.NoError(t, err)
 
 		offset, err := r.fetchLastCommittedOffset(t.Context())
@@ -199,7 +203,7 @@ func TestFetchLastCommittedOffsetForceFromLookback(t *testing.T) {
 		readerClient, err := ingest.NewReaderClient(cfg, ingest.NewReaderClientMetrics(liveStoreServiceName, prometheus.NewRegistry()), l)
 		require.NoError(t, err)
 
-		r, err := newPartitionReader(readerClient, testPartition, cfg, 0, lookback, true, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
+		r, err := newPartitionReader(readerClient, testPartition, cfg, lookback, true, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
 		require.NoError(t, err)
 
 		offset, err := r.fetchLastCommittedOffset(t.Context())
@@ -225,7 +229,7 @@ func TestFetchLastCommittedOffsetForceFromLookback(t *testing.T) {
 		readerClient, err := ingest.NewReaderClient(cfg, ingest.NewReaderClientMetrics(liveStoreServiceName, prometheus.NewRegistry()), l)
 		require.NoError(t, err)
 
-		r, err := newPartitionReader(readerClient, testPartition, cfg, 0, lookback, true, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
+		r, err := newPartitionReader(readerClient, testPartition, cfg, lookback, true, nil, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
 		require.NoError(t, err)
 
 		offset, err := r.fetchLastCommittedOffset(t.Context())
@@ -239,7 +243,7 @@ func TestFetchLastCommittedOffsetForceFromLookback(t *testing.T) {
 	})
 }
 
-func defaultPartitionReaderWithCommitInterval(t *testing.T, address string, commitInterval time.Duration, consume consumeFn) *PartitionReader {
+func defaultPartitionReader(t *testing.T, address string, consume consumeFn) *PartitionReader {
 	l := test.NewTestingLogger(t)
 
 	cfg := ingest.KafkaConfig{}
@@ -255,7 +259,7 @@ func defaultPartitionReaderWithCommitInterval(t *testing.T, address string, comm
 	)
 	require.NoError(t, err)
 
-	r, err := newPartitionReader(client, 0, cfg, commitInterval, time.Hour, false, consume, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
+	r, err := newPartitionReader(client, 0, cfg, time.Hour, false, consume, l, newPartitionReaderMetrics(testPartition, prometheus.NewRegistry()))
 	require.NoError(t, err)
 
 	err = services.StartAndAwaitRunning(t.Context(), r)

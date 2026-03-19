@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
-	"github.com/google/uuid"
 	"github.com/grafana/dskit/kv/consul"
 	"github.com/grafana/dskit/ring"
 	"github.com/grafana/dskit/services"
@@ -38,8 +37,8 @@ import (
 	"github.com/grafana/tempo/pkg/util"
 	"github.com/grafana/tempo/pkg/util/test"
 	"github.com/grafana/tempo/tempodb/backend"
+	"github.com/grafana/tempo/tempodb/backend/local"
 	"github.com/grafana/tempo/tempodb/encoding"
-	"github.com/grafana/tempo/tempodb/wal"
 )
 
 const (
@@ -54,6 +53,7 @@ func TestInstanceSearch(t *testing.T) {
 
 	tagKey := foo
 	tagValue := bar
+	// writeTracesForSearch cuts and completes a block
 	ids, _, _, _ := writeTracesForSearch(t, i, "", tagKey, tagValue, false, false)
 
 	req := &tempopb.SearchRequest{
@@ -61,27 +61,8 @@ func TestInstanceSearch(t *testing.T) {
 	}
 	req.Limit = uint32(len(ids)) + 1
 
-	// Test after appending to WAL. writeTracesforSearch() makes sure all traces are in the wal
+	// Search the completed block
 	sr, err := i.Search(context.Background(), req)
-	assert.NoError(t, err)
-	assert.Len(t, sr.Traces, len(ids))
-	checkEqual(t, ids, sr)
-
-	// Test after cutting new headblock
-	blockID, err := i.cutBlocks(true)
-	require.NoError(t, err)
-	assert.NotEqual(t, blockID, uuid.Nil)
-
-	sr, err = i.Search(context.Background(), req)
-	assert.NoError(t, err)
-	assert.Len(t, sr.Traces, len(ids))
-	checkEqual(t, ids, sr)
-
-	// Test after completing a block
-	err = i.completeBlock(context.Background(), blockID)
-	require.NoError(t, err)
-
-	sr, err = i.Search(context.Background(), req)
 	assert.NoError(t, err)
 	assert.Len(t, sr.Traces, len(ids))
 	checkEqual(t, ids, sr)
@@ -106,34 +87,19 @@ func TestInstanceSearchTraceQL(t *testing.T) {
 
 			req := &tempopb.SearchRequest{Query: query, Limit: 20, SpansPerSpanSet: 10}
 
-			// Test live traces, these are cut roughly every 5 seconds so these should
-			// not exist yet.
+			// Test live traces — not searchable until completed
 			sr, err := i.Search(context.Background(), req)
 			assert.NoError(t, err)
 			assert.Len(t, sr.Traces, 0)
 
-			// Test after appending to WAL
+			// Cut, buffer, and complete a block
 			require.NoError(t, i.cutIdleTraces(true))
-
-			sr, err = i.Search(context.Background(), req)
-			assert.NoError(t, err)
-			assert.Len(t, sr.Traces, len(ids))
-			checkEqual(t, ids, sr)
-
-			// Test after cutting new headBlock
-			blockID, err := i.cutBlocks(true)
-			require.NoError(t, err)
-			assert.NotEqual(t, blockID, uuid.Nil)
-
-			sr, err = i.Search(context.Background(), req)
-			assert.NoError(t, err)
-			assert.Len(t, sr.Traces, len(ids))
-			checkEqual(t, ids, sr)
-
-			// Test after completing a block
-			err = i.completeBlock(context.Background(), blockID)
+			traces := i.cutBlocks(true)
+			require.NotEmpty(t, traces)
+			_, err = i.completeBlock(context.Background(), traces)
 			require.NoError(t, err)
 
+			// Search the completed block
 			sr, err = i.Search(context.Background(), req)
 			assert.NoError(t, err)
 			assert.Len(t, sr.Traces, len(ids))
@@ -182,22 +148,10 @@ func TestInstanceSearchWithStartAndEnd(t *testing.T) {
 	}
 	req.Limit = uint32(len(ids)) + 1
 
-	// Test after appending to WAL.
-	// writeTracesforSearch() makes sure all traces are in the wal
+	// writeTracesForSearch cuts, buffers, and completes a block
 	searchAndAssert(req)
 
-	// Test after cutting new headblock
-	blockID, err := i.cutBlocks(true)
-	require.NoError(t, err)
-	assert.NotEqual(t, blockID, uuid.Nil)
-	searchAndAssert(req)
-
-	// Test after completing a block
-	err = i.completeBlock(context.Background(), blockID)
-	require.NoError(t, err)
-	searchAndAssert(req)
-
-	err = services.StopAndAwaitTerminated(t.Context(), ls)
+	err := services.StopAndAwaitTerminated(t.Context(), ls)
 	require.NoError(t, err)
 }
 
@@ -227,23 +181,10 @@ func TestInstanceSearchTags(t *testing.T) {
 
 	userCtx := user.InjectOrgID(context.Background(), "fake")
 
-	// Test after appending to WAL
+	// writeTracesForSearch cuts, buffers, and completes a block
 	testSearchTagsAndValues(t, userCtx, i, tagKey, expectedTagValues)
 
-	// Test after cutting new headblock
-	blockID, err := i.cutBlocks(true)
-	require.NoError(t, err)
-	assert.NotEqual(t, blockID, uuid.Nil)
-
-	testSearchTagsAndValues(t, userCtx, i, tagKey, expectedTagValues)
-
-	// Test after completing a block
-	err = i.completeBlock(context.Background(), blockID)
-	require.NoError(t, err)
-
-	testSearchTagsAndValues(t, userCtx, i, tagKey, expectedTagValues)
-
-	err = services.StopAndAwaitTerminated(t.Context(), ls)
+	err := services.StopAndAwaitTerminated(t.Context(), ls)
 	require.NoError(t, err)
 }
 
@@ -361,15 +302,10 @@ func TestInstanceSearchMaxBlocksPerTagValuesQueryReturnsPartial(t *testing.T) {
 	tagKey := foo
 	tagValue := bar
 
-	// First block worth of traces
+	// First block worth of traces (writeTracesForSearch completes a block)
 	_, _, _, _ = writeTracesForSearch(t, instance, "", tagKey, tagValue, true, false)
 
-	// Cut the headblock so the next writes land in a new block
-	blockID, err := instance.cutBlocks(true)
-	require.NoError(t, err)
-	assert.NotEqual(t, blockID, uuid.Nil)
-
-	// Second block worth of traces
+	// Second block worth of traces (writeTracesForSearch completes a block)
 	_, _, _, _ = writeTracesForSearch(t, instance, "", tagKey, "another-"+bar, true, false)
 
 	userCtx := user.InjectOrgID(context.Background(), testTenantID)
@@ -479,9 +415,9 @@ func TestSearchTagsV2Limits(t *testing.T) {
 				instance.pushBytes(t.Context(), time.Now(), req)
 				err = instance.cutIdleTraces(true)
 				require.NoError(t, err)
-				blockID, err := instance.cutBlocks(true)
-				require.NoError(t, err)
-				err = instance.completeBlock(ctx, blockID)
+				traces := instance.cutBlocks(true)
+				require.NotEmpty(t, traces)
+				_, err = instance.completeBlock(ctx, traces)
 				require.NoError(t, err)
 			}
 			expectedTags := len(uniqueKeys)
@@ -698,8 +634,12 @@ func writeTracesForSearch(t *testing.T, i *instance, spanName, tagKey, tagValue 
 		i.pushBytes(t.Context(), now, req)
 	}
 
-	// traces have to be cut to show up in searches
+	// traces have to be cut and completed to show up in searches
 	err := i.cutIdleTraces(true)
+	require.NoError(t, err)
+	traces := i.cutBlocks(true)
+	require.NotEmpty(t, traces)
+	_, err = i.completeBlock(context.Background(), traces)
 	require.NoError(t, err)
 
 	return ids, expectedTagValues, expectedEventTagValues, expectedLinkTagValues
@@ -757,10 +697,10 @@ func TestInstanceSearchDoesNotRace(t *testing.T) {
 	})
 
 	concurrent(func() {
-		// Cut wal, complete
-		blockID, _ := i.cutBlocks(true)
-		if blockID != uuid.Nil {
-			err := i.completeBlock(context.Background(), blockID)
+		// Cut trace buffer, complete
+		traces := i.cutBlocks(true)
+		if traces != nil {
+			_, err := i.completeBlock(context.Background(), traces)
 			require.NoError(t, err)
 		}
 	})
@@ -834,25 +774,17 @@ func TestInstanceSearchMetrics(t *testing.T) {
 		return sr.Metrics
 	}
 
-	// Live traces
+	// Live traces — not searchable
 	m := search()
-	require.Equal(t, uint32(0), m.InspectedTraces) // we don't search live traces
-	require.Equal(t, uint64(0), m.InspectedBytes)  // we don't search live traces
+	require.Equal(t, uint32(0), m.InspectedTraces)
+	require.Equal(t, uint64(0), m.InspectedBytes)
 
-	// Test after appending to WAL
+	// Cut, buffer, and complete a block
 	err := i.cutIdleTraces(true)
 	require.NoError(t, err)
-	m = search()
-	require.Less(t, numBytes, m.InspectedBytes)
-
-	// Test after cutting new headblock
-	blockID, err := i.cutBlocks(true)
-	require.NoError(t, err)
-	m = search()
-	require.Less(t, numBytes, m.InspectedBytes)
-
-	// Test after completing a block
-	err = i.completeBlock(context.Background(), blockID)
+	traces := i.cutBlocks(true)
+	require.NotEmpty(t, traces)
+	_, err = i.completeBlock(context.Background(), traces)
 	require.NoError(t, err)
 	m = search()
 	require.Less(t, numBytes, m.InspectedBytes)
@@ -869,44 +801,25 @@ func TestInstanceFindByTraceID(t *testing.T) {
 	ids, _, _, _ := writeTracesForSearch(t, i, "", tagKey, tagValue, false, false)
 	require.Greater(t, len(ids), 0, "writeTracesForSearch should create traces")
 
-	// Test 1: Find traces after being cut to WAL
+	// Test 1: Find traces from completed block (writeTracesForSearch completes the block)
 	resp, err := i.FindByTraceID(context.Background(), ids[0], true)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.Trace)
 	require.Equal(t, ids[0], resp.Trace.ResourceSpans[0].ScopeSpans[0].Spans[0].TraceId)
 
-	// Test 2: Move traces through different sections
-	blockID, err := i.cutBlocks(true)
-	require.NoError(t, err)
-	require.NotEqual(t, blockID, uuid.Nil)
-
-	// Verify we can still find traces from walBlocks
-	resp, err = i.FindByTraceID(context.Background(), ids[0], true)
-	require.NoError(t, err)
-	require.NotNil(t, resp.Trace)
-
-	// Test 3: Complete block (moves to completeBlocks)
-	err = i.completeBlock(context.Background(), blockID)
-	require.NoError(t, err)
-
-	// Verify we can find traces from completed blocks
-	resp, err = i.FindByTraceID(context.Background(), ids[0], true)
-	require.NoError(t, err)
-	require.NotNil(t, resp.Trace)
-
-	// Test 4: Add more traces to new head block
+	// Test 2: Add more traces (creates a second completed block)
 	moreIDs, _, _, _ := writeTracesForSearch(t, i, "", tagKey, "baz", false, false)
 	require.Greater(t, len(moreIDs), 0, "should create more traces")
 
-	// Verify we can find both old and new traces
+	// Verify we can find both old and new traces from different completed blocks
 	resp1, err := i.FindByTraceID(context.Background(), ids[0], true)
 	require.NoError(t, err)
-	require.NotNil(t, resp1.Trace, "Should find trace from completed blocks")
+	require.NotNil(t, resp1.Trace, "Should find trace from first completed block")
 
 	resp2, err := i.FindByTraceID(context.Background(), moreIDs[0], true)
 	require.NoError(t, err)
-	require.NotNil(t, resp2.Trace, "Should find trace from head block")
+	require.NotNil(t, resp2.Trace, "Should find trace from second completed block")
 
 	err = services.StopAndAwaitTerminated(t.Context(), ls)
 	require.NoError(t, err)
@@ -1066,22 +979,16 @@ func TestLiveStoreQueryRange(t *testing.T) {
 	cfg.QueryBlockConcurrency = 10
 	cfg.CompleteBlockTimeout = 5 * time.Minute
 
-	// Create WAL
-	walCfg := &wal.Config{
-		Filepath: path.Join(tempDir, "wal"),
-		Version:  encoding.DefaultEncoding().Version(),
-	}
-	w, err := wal.New(walCfg)
+	// Create local backend for block storage
+	localBackend, err := local.NewBackend(&local.Config{
+		Path: path.Join(tempDir, "blocks"),
+	})
 	require.NoError(t, err)
-	defer func() {
-		// WAL doesn't have a shutdown method, just clean up the temp directory
-		_ = w.Clear()
-	}()
 
 	mover, err := overrides.NewOverrides(overrides.Config{}, nil, prometheus.DefaultRegisterer)
 	require.NoError(t, err)
 	// Create instance
-	inst, err := newInstance(tenant, cfg, w, encoding.DefaultEncoding(), mover, log.NewNopLogger())
+	inst, err := newInstance(tenant, cfg, localBackend, encoding.DefaultEncoding(), mover, log.NewNopLogger())
 	require.NoError(t, err)
 
 	// Create test spans
@@ -1151,13 +1058,12 @@ func TestLiveStoreQueryRange(t *testing.T) {
 	err = inst.cutIdleTraces(true)
 	require.NoError(t, err)
 
-	blockID, err := inst.cutBlocks(true)
-	require.NoError(t, err)
-	require.NotEqual(t, uuid.Nil, blockID)
+	traces := inst.cutBlocks(true)
+	require.NotEmpty(t, traces)
 
 	// Complete the block
 	ctx := context.Background()
-	err = inst.completeBlock(ctx, blockID)
+	_, err = inst.completeBlock(ctx, traces)
 	require.NoError(t, err)
 
 	// Wait a bit to ensure block is ready

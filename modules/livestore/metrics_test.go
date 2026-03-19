@@ -16,8 +16,8 @@ import (
 	"github.com/grafana/tempo/modules/overrides"
 	"github.com/grafana/tempo/pkg/tempopb"
 	"github.com/grafana/tempo/pkg/util/test"
+	"github.com/grafana/tempo/tempodb/backend/local"
 	"github.com/grafana/tempo/tempodb/encoding"
-	"github.com/grafana/tempo/tempodb/wal"
 )
 
 const (
@@ -26,11 +26,11 @@ const (
 
 // testSetup holds common test resources
 type testSetup struct {
-	tmpDir    string
-	wal       *wal.WAL
-	overrides overrides.Interface
-	instance  *instance
-	cleanup   func()
+	tmpDir       string
+	localBackend *local.Backend
+	overrides    overrides.Interface
+	instance     *instance
+	cleanup      func()
 }
 
 // setupTest creates a test instance with all required dependencies
@@ -55,22 +55,21 @@ func setupTest(t *testing.T) *testSetup {
 	cfg.BlockConfig.Version = blockEnc.Version()
 	cfg.WAL.Version = blockEnc.Version()
 
-	// Setup WAL config
-	w, err := wal.New(&wal.Config{
-		Filepath: tmpDir,
-		Version:  blockEnc.Version(),
+	// Setup local backend for block storage
+	lb, err := local.NewBackend(&local.Config{
+		Path: tmpDir,
 	})
 	require.NoError(t, err)
 
-	instance, err := newInstance(testTenant, *cfg, w, blockEnc, o, log.NewNopLogger())
+	instance, err := newInstance(testTenant, *cfg, lb, blockEnc, o, log.NewNopLogger())
 	require.NoError(t, err)
 
 	return &testSetup{
-		tmpDir:    tmpDir,
-		wal:       w,
-		overrides: o,
-		instance:  instance,
-		cleanup:   func() {},
+		tmpDir:       tmpDir,
+		localBackend: lb,
+		overrides:    o,
+		instance:     instance,
+		cleanup:      func() {},
 	}
 }
 
@@ -167,16 +166,16 @@ func TestMetrics_CompletionFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Cut block to prepare for completion
-	blockID, err := setup.instance.cutBlocks(true)
-	require.NoError(t, err)
-	assert.NotEqual(t, uuid.Nil, blockID, "should generate a valid block ID")
+	traces := setup.instance.cutBlocks(true)
+	require.NotEmpty(t, traces)
 
 	// Record initial completion size histogram count
 	initialCompletionSize := getHistogramCount(t, metricCompletionSize)
 
 	// Complete the block
-	err = setup.instance.completeBlock(context.Background(), blockID)
+	blockID, err := setup.instance.completeBlock(context.Background(), traces)
 	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil, blockID, "should generate a valid block ID")
 
 	// Verify completion size metric was updated
 	finalCompletionSize := getHistogramCount(t, metricCompletionSize)

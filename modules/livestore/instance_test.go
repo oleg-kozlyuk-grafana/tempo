@@ -119,9 +119,9 @@ func TestInstanceLimits(t *testing.T) {
 		// cut idle traces but we retain the too large trace in traceSizes
 		err := instance.cutIdleTraces(true)
 		require.NoError(t, err)
-		blockID, err := instance.cutBlocks(true) // this won't clear the trace b/c the trace must not be seen for 2 head block cuts to be fully removed from live traces
-		require.NoError(t, err)
-		err = instance.completeBlock(context.Background(), blockID)
+		traces := instance.cutBlocks(true) // this won't clear the trace b/c the trace must not be seen for 2 head block cuts to be fully removed from live traces
+		require.NotEmpty(t, traces)
+		_, err = instance.completeBlock(context.Background(), traces)
 		require.NoError(t, err)
 
 		// push a second trace so cutIdle/cutBlocks goes through
@@ -130,9 +130,9 @@ func TestInstanceLimits(t *testing.T) {
 
 		err = instance.cutIdleTraces(true)
 		require.NoError(t, err)
-		blockID, err = instance.cutBlocks(true) // this will clear the trace b/c the trace has not been seen for 2 head block cuts
-		require.NoError(t, err)
-		err = instance.completeBlock(context.Background(), blockID)
+		traces = instance.cutBlocks(true) // this will clear the trace b/c the trace has not been seen for 2 head block cuts
+		require.NotEmpty(t, traces)
+		_, err = instance.completeBlock(context.Background(), traces)
 		require.NoError(t, err)
 
 		// Second push with same id will succeed b/c we have gone through one block flush cycles w/o seeing it
@@ -176,7 +176,7 @@ func TestTraceTooLargeLogContainsInsight(t *testing.T) {
 
 	assert.Contains(t, logBuf.String(), "insight=true")
 
-	require.NoError(t, services.StopAndAwaitTerminated(t.Context(), ls))
+	require.NoError(t, services.StopAndAwaitTerminated(context.Background(), ls))
 }
 
 func TestInstanceNoLimits(t *testing.T) {

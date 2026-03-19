@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/google/uuid"
 	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/ring"
 	"github.com/grafana/dskit/services"
@@ -332,7 +331,7 @@ func (s *LiveStore) starting(ctx context.Context) error {
 	}
 
 	lookbackPeriod := 2 * s.cfg.CompleteBlockTimeout
-	s.reader, err = NewPartitionReaderForPusher(s.client, s.ingestPartitionID, s.cfg.IngestConfig.Kafka, s.cfg.CommitInterval, lookbackPeriod, forceFromLookback, s.consume, s.logger, s.reg)
+	s.reader, err = NewPartitionReaderForPusher(s.client, s.ingestPartitionID, s.cfg.IngestConfig.Kafka, lookbackPeriod, forceFromLookback, s.consume, s.logger, s.reg)
 	if err != nil {
 		return fmt.Errorf("failed to create partition reader: %w", err)
 	}
@@ -406,7 +405,7 @@ func (s *LiveStore) stopping(error) error {
 	ingest.ResetLagMetricsForRevokedPartitions(s.cfg.IngestConfig.Kafka.ConsumerGroup, []int32{s.ingestPartitionID})
 
 	// Flush all data to disk
-	s.cutAllInstancesToWal()
+	s.cutAllInstances()
 
 	// Remove the shutdown marker if it exists since we are shutting down
 	shutdownMarkerPath := shutdownmarker.GetPath(s.cfg.ShutdownMarkerDir)
@@ -633,7 +632,7 @@ func (s *LiveStore) getOrCreateInstance(tenantID string) (*instance, error) {
 	}
 
 	// Create new instance
-	inst, err := newInstance(tenantID, s.cfg, s.wal, s.completeBlockEncoding, s.overrides, s.logger)
+	inst, err := newInstance(tenantID, s.cfg, s.wal.LocalBackend(), s.completeBlockEncoding, s.overrides, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create instance for tenant %s: %w", tenantID, err)
 	}
@@ -641,7 +640,7 @@ func (s *LiveStore) getOrCreateInstance(tenantID string) (*instance, error) {
 	s.instances[tenantID] = inst
 
 	s.runInBackground(func() {
-		s.perTenantCutToWalLoop(inst)
+		s.perTenantCutLoop(inst)
 	})
 	s.runInBackground(func() {
 		s.perTenantCleanupLoop(inst)
@@ -660,30 +659,27 @@ func (s *LiveStore) getInstances() []*instance {
 	return instances
 }
 
-func (s *LiveStore) cutAllInstancesToWal() {
+func (s *LiveStore) cutAllInstances() {
 	instances := s.getInstances()
 
 	for _, instance := range instances {
-		s.cutOneInstanceToWal(instance, true)
+		s.cutOneInstance(instance, true)
 	}
 }
 
-func (s *LiveStore) cutOneInstanceToWal(inst *instance, immediate bool) {
-	// Regular trace cuts (live traces -> head block)
+func (s *LiveStore) cutOneInstance(inst *instance, immediate bool) {
+	// Cut idle traces from live traces into the trace buffer
 	err := inst.cutIdleTraces(immediate)
 	if err != nil {
 		level.Error(s.logger).Log("msg", "failed to cut idle traces", "tenant", inst.tenantID, "err", err)
 	}
 
-	// Regular block cuts
-	blockID, err := inst.cutBlocks(immediate)
-	if err != nil {
-		level.Error(s.logger).Log("msg", "failed to cut blocks", "tenant", inst.tenantID, "err", err)
-	}
-
-	// If head block is cut, enqueue complete operation
-	if blockID != uuid.Nil {
-		err = s.enqueueCompleteOp(inst.tenantID, blockID, false)
+	// Check whether the buffer should be flushed to a complete block
+	traces := inst.cutBlocks(immediate)
+	if traces != nil {
+		// Snapshot the current Kafka offset so we can commit it after the block is persisted
+		offset := s.reader.currentOffset()
+		err = s.enqueueCompleteOp(inst.tenantID, traces, offset, false)
 		if err != nil {
 			level.Error(s.logger).Log("msg", "failed to enqueue complete operation", "tenant", inst.tenantID, "err", err)
 			return

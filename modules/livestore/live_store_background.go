@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/tempo/pkg/util"
 	"github.com/grafana/tempo/tempodb/backend"
 	"github.com/grafana/tempo/tempodb/encoding"
+	"github.com/twmb/franz-go/pkg/kadm"
 )
 
 const (
@@ -22,8 +23,10 @@ const (
 )
 
 type completeOp struct {
-	tenantID string
-	blockID  uuid.UUID
+	id          uuid.UUID
+	tenantID    string
+	traces      []*bufferedTrace
+	kafkaOffset *kadm.Offset // commit after successful completion; nil if no offset to commit
 
 	at         time.Time
 	attempts   int
@@ -31,7 +34,7 @@ type completeOp struct {
 	maxBackoff time.Duration
 }
 
-func (o *completeOp) Key() string { return o.tenantID + "/" + o.blockID.String() }
+func (o *completeOp) Key() string { return o.tenantID + "/" + o.id.String() }
 
 func (o *completeOp) Priority() int64 { return -o.at.Unix() }
 
@@ -83,7 +86,7 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 		op.attempts++
 
 		if op.attempts > maxFlushAttempts {
-			level.Error(s.logger).Log("msg", "failed to complete operation", "tenant", op.tenantID, "block", op.blockID, "attempts", op.attempts)
+			level.Error(s.logger).Log("msg", "failed to complete operation", "tenant", op.tenantID, "op", op.id, "attempts", op.attempts)
 			observeFailedOp(op)
 			continue
 		}
@@ -96,12 +99,12 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 			return
 		}
 
-		err = inst.completeBlock(s.ctx, op.blockID)
+		_, err = inst.completeBlock(s.ctx, op.traces)
 		duration := time.Since(start)
 		metricCompletionDuration.Observe(duration.Seconds())
 
 		if err != nil {
-			level.Error(s.logger).Log("msg", "failed to complete block", "tenant", op.tenantID, "block", op.blockID, "err", err)
+			level.Error(s.logger).Log("msg", "failed to complete block", "tenant", op.tenantID, "op", op.id, "err", err)
 			observeFailedOp(op)
 
 			delay := op.backoff()
@@ -113,17 +116,24 @@ func (s *LiveStore) globalCompleteLoop(idx int) {
 				time.Sleep(delay)
 
 				if err := s.requeueOp(op); err != nil {
-					_ = level.Error(s.logger).Log("msg", "failed to requeue block for flushing", "tenant", op.tenantID, "block", op.blockID, "err", err)
+					_ = level.Error(s.logger).Log("msg", "failed to requeue block for flushing", "tenant", op.tenantID, "op", op.id, "err", err)
 				}
 			}()
 		} else {
+			// Commit the Kafka offset after successful block completion so the block
+			// acts as the durability checkpoint.
+			if op.kafkaOffset != nil {
+				if err := s.reader.commitNow(s.ctx, *op.kafkaOffset); err != nil {
+					level.Error(s.logger).Log("msg", "failed to commit kafka offset after block completion", "tenant", op.tenantID, "offset", op.kafkaOffset.At, "err", err)
+				}
+			}
 			metricBlocksCompleted.Inc()
 			s.completeQueues.Clear(op)
 		}
 	}
 }
 
-func (s *LiveStore) perTenantCutToWalLoop(instance *instance) {
+func (s *LiveStore) perTenantCutLoop(instance *instance) {
 	// ticker
 	ticker := time.NewTicker(s.cfg.InstanceFlushPeriod)
 	defer ticker.Stop()
@@ -131,7 +141,7 @@ func (s *LiveStore) perTenantCutToWalLoop(instance *instance) {
 	for {
 		select {
 		case <-ticker.C:
-			s.cutOneInstanceToWal(instance, false)
+			s.cutOneInstance(instance, false)
 		case <-s.ctx.Done():
 			return
 		}
@@ -157,10 +167,12 @@ func (s *LiveStore) perTenantCleanupLoop(inst *instance) {
 	}
 }
 
-func (s *LiveStore) enqueueCompleteOp(tenantID string, blockID uuid.UUID, jitter bool) error {
+func (s *LiveStore) enqueueCompleteOp(tenantID string, traces []*bufferedTrace, offset *kadm.Offset, jitter bool) error {
 	op := &completeOp{
-		tenantID: tenantID,
-		blockID:  blockID,
+		id:          uuid.New(),
+		tenantID:    tenantID,
+		traces:      traces,
+		kafkaOffset: offset,
 		// Initial priority and backoff
 		at:         time.Now(),
 		bo:         s.cfg.initialBackoff,
@@ -179,7 +191,7 @@ func (s *LiveStore) enqueueOpWithJitter(op *completeOp) error {
 	go func() {
 		time.Sleep(delay)
 		if err := s.enqueueOp(op); err != nil {
-			level.Error(s.logger).Log("msg", "failed to enqueue block", "tenant", op.tenantID, "block", op.blockID, "err", err)
+			level.Error(s.logger).Log("msg", "failed to enqueue block", "tenant", op.tenantID, "op", op.id, "err", err)
 		}
 	}()
 	return nil
@@ -187,19 +199,19 @@ func (s *LiveStore) enqueueOpWithJitter(op *completeOp) error {
 
 func (s *LiveStore) enqueueOp(op *completeOp) error {
 	if s.completeQueues.IsStopped() {
-		return fmt.Errorf("complete queues are stopped, cannot enqueue operation for block %s", op.blockID.String())
+		return fmt.Errorf("complete queues are stopped, cannot enqueue operation %s", op.id.String())
 	}
 
-	level.Debug(s.logger).Log("msg", "enqueueing complete op", "tenant", op.tenantID, "block", op.blockID, "attempts", op.attempts)
+	level.Debug(s.logger).Log("msg", "enqueueing complete op", "tenant", op.tenantID, "op", op.id, "attempts", op.attempts)
 	return s.completeQueues.Enqueue(op)
 }
 
 func (s *LiveStore) requeueOp(op *completeOp) error {
 	if s.completeQueues.IsStopped() {
-		return fmt.Errorf("complete queues are stopped, cannot requeue operation for block %s", op.blockID.String())
+		return fmt.Errorf("complete queues are stopped, cannot requeue operation %s", op.id.String())
 	}
 
-	level.Debug(s.logger).Log("msg", "requeueing complete op", "tenant", op.tenantID, "block", op.blockID, "attempts", op.attempts)
+	level.Debug(s.logger).Log("msg", "requeueing complete op", "tenant", op.tenantID, "op", op.id, "attempts", op.attempts)
 	return s.completeQueues.Requeue(op)
 }
 
@@ -212,45 +224,8 @@ func observeFailedOp(op *completeOp) {
 
 func (s *LiveStore) reloadBlocks() error {
 	// ------------------------------------
-	// wal blocks
-	// ------------------------------------
-	level.Info(s.logger).Log("msg", "reloading wal blocks")
-	walBlocks, err := s.wal.RescanBlocks(0, s.logger)
-	if err != nil {
-		return fmt.Errorf("failed to rescan wal blocks: %w", err)
-	}
-
-	for _, blk := range walBlocks {
-		err := func() error {
-			meta := blk.BlockMeta()
-
-			inst, err := s.getOrCreateInstance(meta.TenantID)
-			if err != nil {
-				return fmt.Errorf("failed to get or create instance for tenant %s: %w", meta.TenantID, err)
-			}
-
-			inst.blocksMtx.Lock()
-			defer inst.blocksMtx.Unlock()
-
-			level.Info(s.logger).Log("msg", "reloaded wal block", "block", meta.BlockID.String())
-			inst.walBlocks[(uuid.UUID)(meta.BlockID)] = blk
-
-			level.Info(s.logger).Log("msg", "queueing replayed wal block for completion", "block", meta.BlockID.String())
-			if err := s.enqueueCompleteOp(meta.TenantID, uuid.UUID(meta.BlockID), true); err != nil {
-				return fmt.Errorf("failed to enqueue wal block for completion for tenant %s: %w", meta.TenantID, err)
-			}
-
-			level.Info(s.logger).Log("msg", "reloaded wal blocks", "tenant", inst.tenantID, "count", len(inst.walBlocks))
-
-			return nil
-		}()
-		if err != nil {
-			return err
-		}
-	}
-
-	// ------------------------------------
-	// Complete blocks
+	// Complete blocks only — WAL blocks are no longer written by this service.
+	// On crash, replay is driven by Kafka offset recommitment.
 	// ------------------------------------
 	var (
 		ctx = s.ctx
