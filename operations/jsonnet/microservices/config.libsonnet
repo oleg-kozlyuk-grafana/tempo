@@ -165,7 +165,7 @@
 
     redis: {
       replicas: 3,  // all-active masters, no standby replicas (sharding only)
-      maxmemory: '1024mb',
+      maxmemory: '1536mb',
       maxmemory_policy: 'allkeys-lfu',
       port: 6379,
       resources: {
