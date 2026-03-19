@@ -29,14 +29,24 @@
         pool: {
           queue_depth: 2000,
         },
-        cache: 'memcached',
+        cache: $._config.cache_type,
+      } + (if $._config.cache_type == 'memcached' then {
         memcached: {
           consistent_hash: true,
           timeout: '200ms',
           host: 'memcached',
           service: 'memcached-client',
         },
-      },
+      } else if $._config.cache_type == 'redis' then {
+        redis: {
+          // Comma-separated endpoints trigger ClusterClient mode in the Go Redis client.
+          endpoint: std.join(',', [
+            'redis-%d.redis:%d' % [i, $._config.redis.port]
+            for i in std.range(0, $._config.redis.replicas - 1)
+          ]),
+          timeout: '200ms',
+        },
+      } else {}),
     },
     overrides: {
       per_tenant_override_config: '/overrides/overrides.yaml',

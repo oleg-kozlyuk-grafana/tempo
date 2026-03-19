@@ -27,14 +27,14 @@ memcached {
   },
 
   // Dedicated memcached instance used to cache query results.
-  memcached_all: $.memcached {
+  memcached_all: if $._config.cache_type != 'memcached' then {} else $.memcached {
     name: 'memcached',
     max_item_size: '5m',
   },
 
-  // Vertacal Pod Autoscaler
-  memcached_vpa: $.vpaForController($.memcached_all.statefulSet, 'memcached'),
+  // Vertical Pod Autoscaler
+  memcached_vpa: if $._config.cache_type != 'memcached' then {} else $.vpaForController($.memcached_all.statefulSet, 'memcached'),
 
   // Pod Disruption Budget
-  memcached_pdb: $.pdbForController($.memcached_all.statefulSet, 'memcached'),
+  memcached_pdb: if $._config.cache_type != 'memcached' then {} else $.pdbForController($.memcached_all.statefulSet, 'memcached'),
 }

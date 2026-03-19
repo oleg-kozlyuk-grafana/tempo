@@ -11,6 +11,7 @@
 (import 'backend-worker.libsonnet') +
 (import 'vulture.libsonnet') +
 (import 'memcached.libsonnet') +
+(import 'redis.libsonnet') +
 (import 'memberlist.libsonnet') +
 (import 'vertical-pod-autoscaler.libsonnet') +
 (import 'pod-disruption-budget.libsonnet') +

@@ -5,6 +5,8 @@
     tempo_vulture: 'grafana/tempo-vulture:latest',
     memcached: 'memcached:1.6.40-alpine',
     memcachedExporter: 'prom/memcached-exporter:v0.15.5',
+    redis: 'redis:7.4-alpine',
+    redisExporter: 'oliver006/redis_exporter:v1.67.0',
 
     tempo_distributor: self.tempo,
     tempo_querier: self.tempo,
@@ -153,10 +155,23 @@
         },
       },
     },
+    cache_type: 'memcached',  // 'memcached' or 'redis'
+
     memcached: {
       replicas: 3,
       connection_limit: 4096,
       memory_limit_mb: 1024,
+    },
+
+    redis: {
+      replicas: 3,  // all-active masters, no standby replicas (sharding only)
+      maxmemory: '1024mb',
+      maxmemory_policy: 'allkeys-lfu',
+      port: 6379,
+      resources: {
+        requests: { cpu: '500m', memory: '1536Mi' },
+        limits: { cpu: '1', memory: '2Gi' },
+      },
     },
     jaeger_ui: {
       base_path: '/',
