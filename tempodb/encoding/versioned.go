@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/tempo/tempodb/encoding/vparquet3"
 	"github.com/grafana/tempo/tempodb/encoding/vparquet4"
 	"github.com/grafana/tempo/tempodb/encoding/vparquet5"
+	"github.com/grafana/tempo/tempodb/encoding/vparquet6"
 )
 
 // VersionedEncoding represents a backend block version, and the methods to
@@ -73,6 +74,8 @@ func FromVersion(v string) (VersionedEncoding, error) {
 		return vparquet4.Encoding{}, nil
 	case vparquet5.VersionString:
 		return vparquet5.Encoding{}, nil
+	case vparquet6.VersionString:
+		return vparquet6.Encoding{}, nil
 	default:
 		if strings.Contains(v, "preview") {
 			return unsupported.Encoding{}, nil
@@ -110,6 +113,7 @@ func AllEncodings() []VersionedEncoding {
 		vparquet3.Encoding{},
 		vparquet4.Encoding{},
 		vparquet5.Encoding{},
+		vparquet6.Encoding{},
 	}
 }
 
