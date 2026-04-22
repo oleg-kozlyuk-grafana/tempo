@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -24,13 +25,11 @@ func TestCacheCaches(t *testing.T) {
 		TagNames: []string{"foo", "bar"},
 	}
 
-	// marshal mesage to bytes
-	buf := bytes.NewBuffer([]byte{})
-	err := (&jsonpb.Marshaler{}).Marshal(buf, expected)
+	// marshal message to bytes
+	testData, err := json.Marshal(expected)
 	require.NoError(t, err)
 
 	testKey := "key"
-	testData := buf.Bytes()
 
 	p := test.NewMockProvider()
 	c := newFrontendCache(p, cache.RoleBloom, log.NewNopLogger())
@@ -41,7 +40,7 @@ func TestCacheCaches(t *testing.T) {
 
 	actual := &tempopb.SearchTagsResponse{}
 	buffer := c.fetchBytes(context.Background(), testKey)
-	err = (&jsonpb.Unmarshaler{AllowUnknownFields: true}).Unmarshal(bytes.NewReader(buffer), actual)
+	err = json.Unmarshal(buffer, actual)
 
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)

@@ -1,16 +1,14 @@
 package tempopb
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/gogo/protobuf/jsonpb"
 )
 
-// It marshal a Trace to an OTEL compatible JSON.
-// Historically, our Trace proto message used `batches` to define the array of resourses spans.
-// To be OTEL compatible we renamed it to `resourcesSpans`.
-// To be backward compatible, this function use jsonpb to marshal the Trace to an OTEL compatible JSON
-// and then replace the first occurrence of `resourceSpan` by `batches`.
+// MarshalToJSONV1 marshals a Trace to OTEL-compatible JSON.
+// Replaces "resourceSpans" with "batches" for backward compatibility.
 func MarshalToJSONV1(t *Trace) ([]byte, error) {
 	marshaler := &jsonpb.Marshaler{}
 	jsonStr, err := marshaler.MarshalToString(t)
@@ -21,14 +19,9 @@ func MarshalToJSONV1(t *Trace) ([]byte, error) {
 	return []byte(jsonStr), nil
 }
 
-// It unmarshal an OTEL compatible JSON to a Trace.
-// Historically, our Trace proto message used `batches` to define the array of resourses spans.
-// To be OTEL compatible we renamed it to `resourcesSpan`.
-// To be backward compatible, this function replaces the first occurrence of `batches` by `resourcesSpan`
-// and then use jsonpb to unmarshal JSON into a Trace.
+// UnmarshalFromJSONV1 unmarshals OTEL-compatible JSON into a Trace.
+// Replaces "batches" with "resourceSpans" for backward compatibility.
 func UnmarshalFromJSONV1(data []byte, t *Trace) error {
-	marshaler := &jsonpb.Unmarshaler{}
 	jsonStr := strings.Replace(string(data), `"batches":`, `"resourceSpans":`, 1)
-	err := marshaler.Unmarshal(strings.NewReader(jsonStr), t)
-	return err
+	return json.Unmarshal([]byte(jsonStr), t)
 }

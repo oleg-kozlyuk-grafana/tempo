@@ -332,7 +332,7 @@ func (vs *ValidationService) validateTraceSearch(
 		return fmt.Errorf("no searchable attribute found in trace")
 	}
 
-	searchQuery := fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(attr.Value))
+	searchQuery := fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(&attr.Value))
 	vs.logger.Info("Searching for trace",
 		zap.String("traceID", writtenTrace.HexID()),
 		zap.String("searchQuery", searchQuery),
@@ -400,11 +400,11 @@ func (vs *ValidationService) logTraceAttributes(trace *tempopb.Trace, traceID st
 
 	for i, resourceSpan := range trace.ResourceSpans {
 		vs.logger.Info("Resource attributes", zap.Int("resourceSpan", i))
-		if resourceSpan.Resource != nil {
+		if len(resourceSpan.Resource.Attributes) > 0 {
 			for _, attr := range resourceSpan.Resource.Attributes {
 				vs.logger.Info("  Resource attr",
 					zap.String("key", attr.Key),
-					zap.String("value", util.StringifyAnyValue(attr.Value)),
+					zap.String("value", util.StringifyAnyValue(&attr.Value)),
 				)
 			}
 		}
@@ -419,7 +419,7 @@ func (vs *ValidationService) logTraceAttributes(trace *tempopb.Trace, traceID st
 				for _, attr := range span.Attributes {
 					vs.logger.Info("    Span attr",
 						zap.String("key", attr.Key),
-						zap.String("value", util.StringifyAnyValue(attr.Value)),
+						zap.String("value", util.StringifyAnyValue(&attr.Value)),
 					)
 				}
 			}

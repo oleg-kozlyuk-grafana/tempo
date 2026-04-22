@@ -124,9 +124,10 @@ func (p *Processor) aggregateMetrics(resourceSpans []*v1_trace.ResourceSpans) {
 			getTargetInfoAttributesValues(&resourceLabels, &resourceValues, rs.Resource.Attributes, p.Cfg.TargetInfoExcludedDimensions, p.sanitizeCache.Get)
 		}
 		for _, ils := range rs.ScopeSpans {
-			for _, span := range ils.Spans {
-				if p.filter.ApplyFilterPolicy(rs.Resource, span) {
-					p.aggregateMetricsForSpan(svcName, jobName, instanceID, rs.Resource, span, resourceLabels, resourceValues)
+			for i := range ils.Spans {
+				span := &ils.Spans[i]
+				if p.filter.ApplyFilterPolicy(&rs.Resource, span) {
+					p.aggregateMetricsForSpan(svcName, jobName, instanceID, &rs.Resource, span, resourceLabels, resourceValues)
 					continue
 				}
 				p.filteredSpansCounter.Inc()
@@ -249,13 +250,13 @@ func (p *Processor) aggregateMetricsForSpan(svcName string, jobName string, inst
 	}
 }
 
-func getTargetInfoAttributesValues(keys, values *[]string, attributes []*v1_common.KeyValue, exclude []string, sanitizeFn validation.SanitizeFn) {
+func getTargetInfoAttributesValues(keys, values *[]string, attributes []v1_common.KeyValue, exclude []string, sanitizeFn validation.SanitizeFn) {
 	// TODO allocate with known length, or take new params for existing buffers
 	*keys = (*keys)[:0]
 	*values = (*values)[:0]
-	for _, attrs := range attributes {
+	for i := range attributes {
 		// ignoring job and instance
-		key := attrs.Key
+		key := attributes[i].Key
 		// Skip empty string keys, which are out of spec but
 		// technically possible in the proto. These will cause
 		// issues downstream for metrics datasources
@@ -264,7 +265,7 @@ func getTargetInfoAttributesValues(keys, values *[]string, attributes []*v1_comm
 		}
 		if key != "service.name" && key != "service.namespace" && key != "service.instance.id" && !slices.Contains(exclude, key) {
 			*keys = append(*keys, validation.SanitizeLabelNameWithCollisions(key, targetInfoIntrinsicLabelsSet, sanitizeFn))
-			value := tempo_util.StringifyAnyValue(attrs.Value)
+			value := tempo_util.StringifyAnyValue(&attributes[i].Value)
 			*values = append(*values, value)
 		}
 	}

@@ -22,7 +22,7 @@ func newDeduper() *spanIDDeduper {
 // https://github.com/jaegertracing/jaeger/blob/12bba8c9b91cf4a29d314934bc08f4a80e43c042/model/adjuster/span_id_deduper.go
 type spanIDDeduper struct {
 	trace     *tempopb.Trace
-	spansByID map[uint64][]*v1.Span
+	spansByID map[uint64][]v1.Span
 	maxUsedID uint64
 }
 
@@ -41,7 +41,7 @@ func (s *spanIDDeduper) dedupe(trace *tempopb.Trace) *tempopb.Trace {
 
 // groupSpansByID groups spans with the same ID returning a map id -> []Span
 func (s *spanIDDeduper) groupSpansByID() {
-	spansByID := make(map[uint64][]*v1.Span)
+	spansByID := make(map[uint64][]v1.Span)
 	for _, batch := range s.trace.ResourceSpans {
 		for _, ils := range batch.ScopeSpans {
 			for _, span := range ils.Spans {
@@ -50,7 +50,7 @@ func (s *spanIDDeduper) groupSpansByID() {
 					// TODO maybe return an error if more than 2 spans found
 					spansByID[id] = append(spans, span)
 				} else {
-					spansByID[id] = []*v1.Span{span}
+					spansByID[id] = []v1.Span{span}
 				}
 			}
 		}
@@ -70,8 +70,9 @@ func (s *spanIDDeduper) isSharedWithClientSpan(spanID uint64) bool {
 func (s *spanIDDeduper) dedupeSpanIDs() {
 	oldToNewSpanIDs := make(map[uint64]uint64)
 	for _, batch := range s.trace.ResourceSpans {
-		for _, ils := range batch.ScopeSpans {
-			for _, span := range ils.Spans {
+		for i := range batch.ScopeSpans {
+			for j := range batch.ScopeSpans[i].Spans {
+				span := &batch.ScopeSpans[i].Spans[j]
 				id := binary.BigEndian.Uint64(span.SpanId)
 				// only replace span IDs for server-side spans that share the ID with something else
 				if span.GetKind() == v1.Span_SPAN_KIND_SERVER && s.isSharedWithClientSpan(id) {
@@ -100,8 +101,9 @@ func (s *spanIDDeduper) swapParentIDs(oldToNewSpanIDs map[uint64]uint64) {
 		return
 	}
 	for _, batch := range s.trace.ResourceSpans {
-		for _, ils := range batch.ScopeSpans {
-			for _, span := range ils.Spans {
+		for i := range batch.ScopeSpans {
+			for j := range batch.ScopeSpans[i].Spans {
+				span := &batch.ScopeSpans[i].Spans[j]
 				if len(span.GetParentSpanId()) > 0 {
 					parentSpanID := binary.BigEndian.Uint64(span.GetParentSpanId())
 					if newParentID, ok := oldToNewSpanIDs[parentSpanID]; ok {

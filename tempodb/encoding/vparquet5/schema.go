@@ -2,6 +2,7 @@ package vparquet5
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 
 	"github.com/golang/protobuf/jsonpb" //nolint:all //deprecated
@@ -313,7 +314,7 @@ func attrToParquet(a *v1.KeyValue, p *Attribute) {
 		p.ValueBool = append(p.ValueBool, v.BoolValue)
 	case *v1.AnyValue_ArrayValue:
 		p.IsArray = true
-		if v.ArrayValue == nil || len(v.ArrayValue.Values) == 0 {
+		if len(v.ArrayValue.Values) == 0 {
 			return
 		}
 		switch v.ArrayValue.Values[0].Value.(type) {
@@ -371,7 +372,7 @@ func attrToParquet(a *v1.KeyValue, p *Attribute) {
 
 func attrToParquetTypeUnsupported(a *v1.KeyValue, p *Attribute) {
 	jsonBytes := &bytes.Buffer{}
-	_ = jsonMarshaler.Marshal(jsonBytes, a.Value) // deliberately marshalling a.Value because of AnyValue logic
+	if b, err := json.Marshal(&a.Value); err == nil { jsonBytes.Write(b) } // deliberately marshalling a.Value because of AnyValue logic
 	jsonStr := jsonBytes.String()
 	p.ValueUnsupported = &jsonStr
 	p.IsArray = false
@@ -410,12 +411,12 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 		ob.Resource.ServiceName = ""
 		ob.Resource.DedicatedAttributes.Reset()
 
-		if b.Resource != nil {
+		{
 			ob.Resource.Attrs = extendReuseSlice(len(b.Resource.Attributes), ob.Resource.Attrs)
 			ob.Resource.DroppedAttributesCount = int32(b.Resource.DroppedAttributesCount)
 
 			attrCount := 0
-			for _, a := range b.Resource.Attributes {
+			for i, a := range b.Resource.Attributes {
 				var written bool
 				if strVal, ok := a.Value.Value.(*v1.AnyValue_StringValue); ok && a.Key == LabelServiceName {
 					ob.Resource.ServiceName = strVal.StringValue
@@ -425,13 +426,13 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 				if !written {
 					// Dynamically assigned dedicated resource attribute columns
 					if spareColumn, exists := dedicatedResourceAttributes.get(a.Key); exists {
-						written = spareColumn.writeValue(&ob.Resource.DedicatedAttributes, a.Value)
+						written = spareColumn.writeValue(&ob.Resource.DedicatedAttributes, &a.Value)
 					}
 				}
 
 				if !written {
 					// Other attributes put in generic columns
-					attrToParquet(a, &ob.Resource.Attrs[attrCount])
+					attrToParquet(&b.Resource.Attributes[i], &ob.Resource.Attrs[attrCount])
 					attrCount++
 				}
 			}
@@ -441,7 +442,7 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 		ob.ScopeSpans = extendReuseSlice(len(b.ScopeSpans), ob.ScopeSpans)
 		for iils, ils := range b.ScopeSpans {
 			oils := &ob.ScopeSpans[iils]
-			instrumentationScopeToParquet(ils.Scope, &oils.Scope)
+			instrumentationScopeToParquet(&ils.Scope, &oils.Scope)
 
 			oils.Spans = extendReuseSlice(len(ils.Spans), oils.Spans)
 			oils.SpanCount = int32(len(ils.Spans))
@@ -455,7 +456,8 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 					traceEnd = s.EndTimeUnixNano
 				}
 				var hasChildOfLink bool
-				for _, spanLink := range s.Links {
+				for iLink := range s.Links {
+					spanLink := &s.Links[iLink]
 					if bytes.Equal(s.TraceId, spanLink.TraceId) {
 						for _, attr := range spanLink.GetAttributes() {
 							if attr.Key == "opentracing.ref_type" && attr.GetValue().GetStringValue() == "child_of" {
@@ -470,7 +472,7 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 				}
 
 				if len(s.ParentSpanId) == 0 && !hasChildOfLink {
-					rootSpan = s
+					rootSpan = &b.ScopeSpans[iils].Spans[is]
 					rootBatch = b
 				}
 
@@ -485,13 +487,8 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 				ss.Name = s.Name
 				ss.Kind = int(s.Kind)
 				ss.TraceState = s.TraceState
-				if s.Status != nil {
-					ss.StatusCode = int(s.Status.Code)
-					ss.StatusMessage = s.Status.Message
-				} else {
-					ss.StatusCode = 0
-					ss.StatusMessage = ""
-				}
+				ss.StatusCode = int(s.Status.Code)
+				ss.StatusMessage = s.Status.Message
 				ss.StartTimeUnixNano = s.StartTimeUnixNano
 				if s.StartTimeUnixNano == 0 {
 					ss.StartTimeRounded15 = 0
@@ -509,13 +506,13 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 				ss.DroppedEventsCount = int32(s.DroppedEventsCount)
 
 				ss.Events = extendReuseSlice(len(s.Events), ss.Events)
-				for ie, e := range s.Events {
-					eventToParquet(e, &ss.Events[ie], s.StartTimeUnixNano, dedicatedEventAttributes)
+				for ie := range s.Events {
+					eventToParquet(&s.Events[ie], &ss.Events[ie], s.StartTimeUnixNano, dedicatedEventAttributes)
 				}
 
 				ss.Links = extendReuseSlice(len(s.Links), ss.Links)
-				for ie, e := range s.Links {
-					linkToParquet(e, &ss.Links[ie])
+				for ie := range s.Links {
+					linkToParquet(&s.Links[ie], &ss.Links[ie])
 				}
 
 				ss.DroppedLinksCount = int32(s.DroppedLinksCount)
@@ -530,7 +527,7 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 	ot.RootSpanName = ""
 	ot.RootServiceName = ""
 
-	if rootSpan != nil && rootBatch != nil && rootBatch.Resource != nil {
+	if rootSpan != nil && rootBatch != nil {
 		ot.RootSpanName = rootSpan.Name
 
 		for _, a := range rootBatch.Resource.Attributes {
@@ -544,20 +541,20 @@ func traceToParquetWithMapping(id common.ID, tr *tempopb.Trace, ot *Trace, dedic
 	return finalizeTrace(ot)
 }
 
-func writeAttrs(input []*v1.KeyValue, generic *[]Attribute, dedicated *DedicatedAttributes, mapping dedicatedColumnMapping) {
+func writeAttrs(input []v1.KeyValue, generic *[]Attribute, dedicated *DedicatedAttributes, mapping dedicatedColumnMapping) {
 	*generic = extendReuseSlice(len(input), *generic)
 	dedicated.Reset()
 
 	attrCount := 0
-	for _, a := range input {
+	for i, a := range input {
 		written := false
 
 		if spareColumn, exists := mapping.get(a.Key); exists {
-			written = spareColumn.writeValue(dedicated, a.Value)
+			written = spareColumn.writeValue(dedicated, &a.Value)
 		}
 
 		if !written {
-			attrToParquet(a, &(*generic)[attrCount])
+			attrToParquet(&input[i], &(*generic)[attrCount])
 			attrCount++
 		}
 	}
@@ -586,8 +583,8 @@ func instrumentationScopeToParquet(s *v1.InstrumentationScope, ss *Instrumentati
 	ss.DroppedAttributesCount = int32(s.DroppedAttributesCount)
 
 	ss.Attrs = extendReuseSlice(len(s.Attributes), ss.Attrs)
-	for i, a := range s.Attributes {
-		attrToParquet(a, &ss.Attrs[i])
+	for i := range s.Attributes {
+		attrToParquet(&s.Attributes[i], &ss.Attrs[i])
 	}
 }
 
@@ -605,13 +602,13 @@ func linkToParquet(l *v1_trace.Span_Link, ll *Link) {
 	ll.DroppedAttributesCount = int32(l.DroppedAttributesCount)
 
 	ll.Attrs = extendReuseSlice(len(l.Attributes), ll.Attrs)
-	for i, a := range l.Attributes {
-		attrToParquet(a, &ll.Attrs[i])
+	for i := range l.Attributes {
+		attrToParquet(&l.Attributes[i], &ll.Attrs[i])
 	}
 }
 
-func parquetToProtoAttrs(parquetAttrs []Attribute) []*v1.KeyValue {
-	var protoAttrs []*v1.KeyValue
+func parquetToProtoAttrs(parquetAttrs []Attribute) []v1.KeyValue {
+	var protoAttrs []v1.KeyValue
 
 	for _, attr := range parquetAttrs {
 		var protoVal v1.AnyValue
@@ -627,79 +624,67 @@ func parquetToProtoAttrs(parquetAttrs []Attribute) []*v1.KeyValue {
 			case len(attr.ValueBool) > 0:
 				protoVal.Value = &v1.AnyValue_BoolValue{BoolValue: attr.ValueBool[0]}
 			case attr.ValueUnsupported != nil:
-				_ = jsonpb.Unmarshal(bytes.NewBufferString(*attr.ValueUnsupported), &protoVal)
+				_ = json.Unmarshal([]byte(*attr.ValueUnsupported), &protoVal)
 			default:
 				continue
 			}
 		} else {
 			switch {
 			case len(attr.Value) > 0:
-				values := make([]*v1.AnyValue, len(attr.Value))
-
-				anyValues := make([]v1.AnyValue, len(values))
+				values := make([]v1.AnyValue, len(attr.Value))
 				strValues := make([]v1.AnyValue_StringValue, len(values))
 				for i, v := range attr.Value {
 					s := &strValues[i]
 					s.StringValue = v
-					values[i] = &anyValues[i]
 					values[i].Value = s
 				}
 
-				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}
+				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}
 			case len(attr.ValueInt) > 0:
-				values := make([]*v1.AnyValue, len(attr.ValueInt))
-
-				anyValues := make([]v1.AnyValue, len(values))
+				values := make([]v1.AnyValue, len(attr.ValueInt))
 				intValues := make([]v1.AnyValue_IntValue, len(values))
 				for i, v := range attr.ValueInt {
 					n := &intValues[i]
 					n.IntValue = v
-					values[i] = &anyValues[i]
 					values[i].Value = n
 				}
 
-				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}
+				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}
 			case len(attr.ValueDouble) > 0:
-				values := make([]*v1.AnyValue, len(attr.ValueDouble))
-
-				anyValues := make([]v1.AnyValue, len(values))
+				values := make([]v1.AnyValue, len(attr.ValueDouble))
 				doubleValues := make([]v1.AnyValue_DoubleValue, len(values))
 				for i, v := range attr.ValueDouble {
 					n := &doubleValues[i]
 					n.DoubleValue = v
-					values[i] = &anyValues[i]
 					values[i].Value = n
 				}
 
-				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}
+				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}
 			case len(attr.ValueBool) > 0:
-				values := make([]*v1.AnyValue, len(attr.ValueBool))
-
-				anyValues := make([]v1.AnyValue, len(values))
+				values := make([]v1.AnyValue, len(attr.ValueBool))
 				boolValues := make([]v1.AnyValue_BoolValue, len(values))
 				for i, v := range attr.ValueBool {
 					n := &boolValues[i]
 					n.BoolValue = v
-					values[i] = &anyValues[i]
 					values[i].Value = n
 				}
 
-				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}
+				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}
 			default:
-				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{}}}
+				protoVal.Value = &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{}}}
 			}
 		}
 
-		protoAttrs = append(protoAttrs, &v1.KeyValue{
+		protoAttrs = append(protoAttrs, v1.KeyValue{
 			Key:   attr.Key,
-			Value: &protoVal,
+			Value: protoVal,
 		})
 	}
 
 	return protoAttrs
 }
 
-func parquetToProtoInstrumentationScope(parquetScope *InstrumentationScope) *v1.InstrumentationScope {
+func parquetToProtoInstrumentationScope(parquetScope *InstrumentationScope) v1.InstrumentationScope {
 	scope := v1.InstrumentationScope{
 		Name:                   parquetScope.Name,
 		Version:                parquetScope.Version,
@@ -710,16 +695,16 @@ func parquetToProtoInstrumentationScope(parquetScope *InstrumentationScope) *v1.
 		scope.Attributes = parquetToProtoAttrs(parquetScope.Attrs)
 	}
 
-	return &scope
+	return scope
 }
 
-func parquetToProtoLinks(parquetLinks []Link) []*v1_trace.Span_Link {
-	var protoLinks []*v1_trace.Span_Link
+func parquetToProtoLinks(parquetLinks []Link) []v1_trace.Span_Link {
+	var protoLinks []v1_trace.Span_Link
 
 	if len(parquetLinks) > 0 {
-		protoLinks = make([]*v1_trace.Span_Link, 0, len(parquetLinks))
+		protoLinks = make([]v1_trace.Span_Link, 0, len(parquetLinks))
 		for _, l := range parquetLinks {
-			protoLink := &v1_trace.Span_Link{
+			protoLink := v1_trace.Span_Link{
 				TraceId:                l.TraceID,
 				SpanId:                 l.SpanID,
 				TraceState:             l.TraceState,
@@ -738,15 +723,15 @@ func parquetToProtoLinks(parquetLinks []Link) []*v1_trace.Span_Link {
 	return protoLinks
 }
 
-func parquetToProtoEvents(parquetEvents []Event, spanStartTimeNano uint64, dedicatedAttributes dedicatedColumnMapping) []*v1_trace.Span_Event {
-	var protoEvents []*v1_trace.Span_Event
+func parquetToProtoEvents(parquetEvents []Event, spanStartTimeNano uint64, dedicatedAttributes dedicatedColumnMapping) []v1_trace.Span_Event {
+	var protoEvents []v1_trace.Span_Event
 
 	if len(parquetEvents) > 0 {
-		protoEvents = make([]*v1_trace.Span_Event, 0, len(parquetEvents))
+		protoEvents = make([]v1_trace.Span_Event, 0, len(parquetEvents))
 
 		for _, e := range parquetEvents {
 
-			protoEvent := &v1_trace.Span_Event{
+			protoEvent := v1_trace.Span_Event{
 				TimeUnixNano:           e.TimeSinceStartNano + spanStartTimeNano,
 				Name:                   e.Name,
 				Attributes:             nil,
@@ -760,9 +745,9 @@ func parquetToProtoEvents(parquetEvents []Event, spanStartTimeNano uint64, dedic
 			for attr, col := range dedicatedAttributes.items() {
 				val := col.readValue(&e.DedicatedAttributes)
 				if val != nil {
-					protoEvent.Attributes = append(protoEvent.Attributes, &v1.KeyValue{
+					protoEvent.Attributes = append(protoEvent.Attributes, v1.KeyValue{
 						Key:   attr,
-						Value: val,
+						Value: *val,
 					})
 				}
 			}
@@ -786,7 +771,7 @@ func ParquetTraceToTempopbTrace(meta *backend.BlockMeta, parquetTrace *Trace) *t
 	for _, rs := range parquetTrace.ResourceSpans {
 		protoBatch := &v1_trace.ResourceSpans{}
 		resAttrs := parquetToProtoAttrs(rs.Resource.Attrs)
-		protoBatch.Resource = &v1_resource.Resource{
+		protoBatch.Resource = v1_resource.Resource{
 			Attributes:             resAttrs,
 			DroppedAttributesCount: uint32(rs.Resource.DroppedAttributesCount),
 		}
@@ -795,18 +780,18 @@ func ParquetTraceToTempopbTrace(meta *backend.BlockMeta, parquetTrace *Trace) *t
 		for attr, col := range dedicatedResourceAttributes.items() {
 			val := col.readValue(&rs.Resource.DedicatedAttributes)
 			if val != nil {
-				protoBatch.Resource.Attributes = append(protoBatch.Resource.Attributes, &v1.KeyValue{
+				protoBatch.Resource.Attributes = append(protoBatch.Resource.Attributes, v1.KeyValue{
 					Key:   attr,
-					Value: val,
+					Value: *val,
 				})
 			}
 		}
 
 		// known resource attributes
 		if rs.Resource.ServiceName != "" {
-			protoBatch.Resource.Attributes = append(protoBatch.Resource.Attributes, &v1.KeyValue{
+			protoBatch.Resource.Attributes = append(protoBatch.Resource.Attributes, v1.KeyValue{
 				Key: LabelServiceName,
-				Value: &v1.AnyValue{
+				Value: v1.AnyValue{
 					Value: &v1.AnyValue_StringValue{
 						StringValue: rs.Resource.ServiceName,
 					},
@@ -814,18 +799,18 @@ func ParquetTraceToTempopbTrace(meta *backend.BlockMeta, parquetTrace *Trace) *t
 			})
 		}
 
-		protoBatch.ScopeSpans = make([]*v1_trace.ScopeSpans, 0, len(rs.ScopeSpans))
+		protoBatch.ScopeSpans = make([]v1_trace.ScopeSpans, 0, len(rs.ScopeSpans))
 
 		for _, scopeSpan := range rs.ScopeSpans {
-			protoSS := &v1_trace.ScopeSpans{
+			protoSS := v1_trace.ScopeSpans{
 				Scope: parquetToProtoInstrumentationScope(&scopeSpan.Scope),
 			}
 
-			protoSS.Spans = make([]*v1_trace.Span, 0, len(scopeSpan.Spans))
+			protoSS.Spans = make([]v1_trace.Span, 0, len(scopeSpan.Spans))
 			for _, span := range scopeSpan.Spans {
 
 				spanAttr := parquetToProtoAttrs(span.Attrs)
-				protoSpan := &v1_trace.Span{
+				protoSpan := v1_trace.Span{
 					TraceId:           parquetTrace.TraceID,
 					SpanId:            span.SpanID,
 					TraceState:        span.TraceState,
@@ -834,7 +819,7 @@ func ParquetTraceToTempopbTrace(meta *backend.BlockMeta, parquetTrace *Trace) *t
 					ParentSpanId:      span.ParentSpanID,
 					StartTimeUnixNano: span.StartTimeUnixNano,
 					EndTimeUnixNano:   span.StartTimeUnixNano + span.DurationNano,
-					Status: &v1_trace.Status{
+					Status: v1_trace.Status{
 						Message: span.StatusMessage,
 						Code:    v1_trace.Status_StatusCode(span.StatusCode),
 					},
@@ -850,9 +835,9 @@ func ParquetTraceToTempopbTrace(meta *backend.BlockMeta, parquetTrace *Trace) *t
 				for attr, col := range dedicatedSpanAttributes.items() {
 					val := col.readValue(&span.DedicatedAttributes)
 					if val != nil {
-						protoSpan.Attributes = append(protoSpan.Attributes, &v1.KeyValue{
+						protoSpan.Attributes = append(protoSpan.Attributes, v1.KeyValue{
 							Key:   attr,
-							Value: val,
+							Value: *val,
 						})
 					}
 				}

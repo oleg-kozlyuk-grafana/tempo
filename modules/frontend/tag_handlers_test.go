@@ -1,8 +1,8 @@
 package frontend
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/status"
 	"github.com/gorilla/mux"
@@ -264,7 +263,7 @@ func TestSearchTagsV2Intrinsics(t *testing.T) {
 			resp := &tempopb.SearchTagsV2Response{}
 			bytesResp, err := io.ReadAll(httpResp.Body)
 			require.NoError(t, err)
-			err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), resp)
+			err = json.Unmarshal(bytesResp, resp)
 
 			require.NoError(t, err)
 
@@ -625,7 +624,7 @@ func TestSearchTagsV2AccessesCache(t *testing.T) {
 	actualResp := &tempopb.SearchTagsV2Response{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// confirm cache key exists and matches the response above
@@ -633,7 +632,7 @@ func TestSearchTagsV2AccessesCache(t *testing.T) {
 	require.Equal(t, 1, len(bufs))
 
 	actualCache := &tempopb.SearchTagsV2Response{}
-	err = jsonpb.Unmarshal(bytes.NewReader(bufs[0]), actualCache)
+	err = json.Unmarshal(bufs[0], actualCache)
 	require.NoError(t, err)
 
 	// zeroing these out b/c they are set by the sharder and won't be in cache
@@ -651,10 +650,10 @@ func TestSearchTagsV2AccessesCache(t *testing.T) {
 		},
 		Metrics: &tempopb.MetadataMetrics{},
 	}
-	overwriteString, err := (&jsonpb.Marshaler{}).MarshalToString(overwriteResp)
+	overwriteBytes, err := json.Marshal(overwriteResp)
 	require.NoError(t, err)
 
-	c.Store(context.Background(), []string{cacheKey}, [][]byte{[]byte(overwriteString)})
+	c.Store(context.Background(), []string{cacheKey}, [][]byte{overwriteBytes})
 
 	respWriter = httptest.NewRecorder()
 	f.SearchTagsV2Handler.ServeHTTP(respWriter, req)
@@ -665,7 +664,7 @@ func TestSearchTagsV2AccessesCache(t *testing.T) {
 	actualResp = &tempopb.SearchTagsV2Response{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	require.Equal(t, overwriteResp, actualResp)
@@ -746,7 +745,7 @@ func TestTagValuesCachedMetrics(t *testing.T) {
 	actualResp := &tempopb.SearchTagValuesV2Response{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are collected
@@ -762,7 +761,7 @@ func TestTagValuesCachedMetrics(t *testing.T) {
 	actualResp = &tempopb.SearchTagValuesV2Response{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are 0 because the response was cached
@@ -839,7 +838,7 @@ func TestTagsCachedMetrics(t *testing.T) {
 	actualResp := &tempopb.SearchTagsV2Response{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are collected
@@ -855,7 +854,7 @@ func TestTagsCachedMetrics(t *testing.T) {
 	actualResp = &tempopb.SearchTagsV2Response{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are 0 because the response was cached

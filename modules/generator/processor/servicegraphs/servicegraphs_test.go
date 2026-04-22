@@ -3,6 +3,7 @@ package servicegraphs
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/grafana/tempo/modules/generator/processor/servicegraphs/store"
 	"github.com/grafana/tempo/modules/generator/registry"
 	filterconfig "github.com/grafana/tempo/pkg/spanfilter/config"
@@ -495,19 +495,19 @@ func TestServiceGraphs_droppedEdgesMetric(t *testing.T) {
 	request := &tempopb.PushSpansRequest{
 		Batches: []*tracev1.ResourceSpans{
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-a"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								SpanId:            spanID,
@@ -557,19 +557,19 @@ func TestServiceGraphs_droppedEdgesMetric_fromFilteredCounterpart(t *testing.T) 
 	request := &tempopb.PushSpansRequest{
 		Batches: []*tracev1.ResourceSpans{
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-a"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								SpanId:            clientSpanID,
@@ -582,19 +582,19 @@ func TestServiceGraphs_droppedEdgesMetric_fromFilteredCounterpart(t *testing.T) 
 				},
 			},
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-b"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								ParentSpanId:      clientSpanID,
@@ -645,19 +645,19 @@ func TestServiceGraphs_droppedEdgesMetric_whenFilteredSpanDropsBufferedCounterpa
 	request := &tempopb.PushSpansRequest{
 		Batches: []*tracev1.ResourceSpans{
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-b"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								ParentSpanId:      clientSpanID,
@@ -671,19 +671,19 @@ func TestServiceGraphs_droppedEdgesMetric_whenFilteredSpanDropsBufferedCounterpa
 				},
 			},
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-a"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								SpanId:            clientSpanID,
@@ -729,19 +729,19 @@ func TestServiceGraphs_filteredRootServerSpanDoesNotAddDroppedCounterpart(t *tes
 	request := &tempopb.PushSpansRequest{
 		Batches: []*tracev1.ResourceSpans{
 			{
-				Resource: &resourcev1.Resource{
-					Attributes: []*v1.KeyValue{
+				Resource: resourcev1.Resource{
+					Attributes: []v1.KeyValue{
 						{
 							Key: "service.name",
-							Value: &v1.AnyValue{
+							Value: v1.AnyValue{
 								Value: &v1.AnyValue_StringValue{StringValue: "svc-a"},
 							},
 						},
 					},
 				},
-				ScopeSpans: []*tracev1.ScopeSpans{
+				ScopeSpans: []tracev1.ScopeSpans{
 					{
-						Spans: []*tracev1.Span{
+						Spans: []tracev1.Span{
 							{
 								TraceId:           traceID,
 								Kind:              tracev1.Span_SPAN_KIND_SERVER,
@@ -1008,7 +1008,7 @@ func loadTestData(path string) (*tempopb.PushSpansRequest, error) {
 	}
 
 	trace := &tempopb.Trace{}
-	err = jsonpb.Unmarshal(f, trace)
+	err = json.NewDecoder(f).Decode(trace)
 	return &tempopb.PushSpansRequest{Batches: trace.ResourceSpans}, err
 }
 

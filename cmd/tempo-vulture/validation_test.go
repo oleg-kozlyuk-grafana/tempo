@@ -91,9 +91,9 @@ func TestValidateTraceRetrieval(t *testing.T) {
 			traceResponse: &tempopb.Trace{
 				ResourceSpans: []*v1.ResourceSpans{
 					{
-						ScopeSpans: []*v1.ScopeSpans{
+						ScopeSpans: []v1.ScopeSpans{
 							{
-								Spans: []*v1.Span{
+								Spans: []v1.Span{
 									{
 										// TraceId will be set dynamically to match
 										Name: "test-span",
@@ -245,9 +245,9 @@ func TestRunValidation(t *testing.T) {
 			retrievalTrace: &tempopb.Trace{
 				ResourceSpans: []*v1.ResourceSpans{
 					{
-						ScopeSpans: []*v1.ScopeSpans{
+						ScopeSpans: []v1.ScopeSpans{
 							{
-								Spans: []*v1.Span{
+								Spans: []v1.Span{
 									{Name: "test-span"},
 								},
 							},
@@ -335,9 +335,9 @@ func TestRunValidation(t *testing.T) {
 
 				// Set the trace ID in all spans of the mock response
 				for _, resourceSpan := range tt.retrievalTrace.ResourceSpans {
-					for _, scopeSpan := range resourceSpan.ScopeSpans {
-						for _, span := range scopeSpan.Spans {
-							span.TraceId = traceIDBytes
+					for i := range resourceSpan.ScopeSpans {
+						for j := range resourceSpan.ScopeSpans[i].Spans {
+							resourceSpan.ScopeSpans[i].Spans[j].TraceId = traceIDBytes
 						}
 					}
 				}

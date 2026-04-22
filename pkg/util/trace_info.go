@@ -377,11 +377,11 @@ func RandomAttrFromTrace(t *tempopb.Trace) *v1common.KeyValue {
 		// skip service.name because service names have low cardinality and produce queries with
 		// too many results in tempo-vulture
 		if attr.Key != "service.name" {
-			if attr.Value == nil {
-				return attr
+			if attr.Value.Value == nil {
+				return &attr
 			}
 			if _, ok := attr.Value.Value.(*v1common.AnyValue_IntValue); !ok {
-				return attr
+				return &attr
 			}
 		}
 	}
@@ -402,8 +402,9 @@ func RandomAttrFromTrace(t *tempopb.Trace) *v1common.KeyValue {
 
 	// Pick only from non-integer attributes (integers are not unique enough for search).
 	nonIntAttrs := make([]*v1common.KeyValue, 0, len(span.Attributes))
-	for _, a := range span.Attributes {
-		if a.Value == nil {
+	for i := range span.Attributes {
+		a := &span.Attributes[i]
+		if a.Value.Value == nil {
 			nonIntAttrs = append(nonIntAttrs, a)
 		} else if _, ok := a.Value.Value.(*v1common.AnyValue_IntValue); !ok {
 			nonIntAttrs = append(nonIntAttrs, a)

@@ -70,13 +70,13 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{},
+				Attributes: []commonv1.KeyValue{},
 			},
 			span: &tracev1.Span{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "kind",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "SPAN_KIND_CLIENT",
 							},
@@ -98,7 +98,7 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{},
+				Attributes: []commonv1.KeyValue{},
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_CLIENT,
@@ -133,10 +133,10 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "name",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "test",
 							},
@@ -144,7 +144,7 @@ func Test_splitPolicy_Match(t *testing.T) {
 					},
 					{
 						Key: "location",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "earth",
 							},
@@ -152,7 +152,7 @@ func Test_splitPolicy_Match(t *testing.T) {
 					},
 					{
 						Key: "othervalue",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "somethinginteresting",
 							},
@@ -162,10 +162,10 @@ func Test_splitPolicy_Match(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_CLIENT,
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "status.code",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "STATUS_CODE_OK",
 							},
@@ -190,12 +190,12 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{},
+				Attributes: []commonv1.KeyValue{},
 			},
 			span: &tracev1.Span{
 				Kind:       tracev1.Span_SPAN_KIND_CLIENT,
-				Status:     &tracev1.Status{Message: "OK", Code: tracev1.Status_STATUS_CODE_OK},
-				Attributes: []*commonv1.KeyValue{},
+				Status:     tracev1.Status{Message: "OK", Code: tracev1.Status_STATUS_CODE_OK},
+				Attributes: []commonv1.KeyValue{},
 			},
 		},
 		{
@@ -215,10 +215,10 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "location",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "earth",
 							},
@@ -226,7 +226,7 @@ func Test_splitPolicy_Match(t *testing.T) {
 					},
 					{
 						Key: "othervalue",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "somethinginteresting",
 							},
@@ -235,7 +235,7 @@ func Test_splitPolicy_Match(t *testing.T) {
 				},
 			},
 			span: &tracev1.Span{
-				Attributes: []*commonv1.KeyValue{},
+				Attributes: []commonv1.KeyValue{},
 			},
 		},
 	}
@@ -304,10 +304,10 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "name",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "test",
 							},
@@ -315,7 +315,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "location",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "earth",
 							},
@@ -323,7 +323,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "othervalue",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "somethinginteresting",
 							},
@@ -333,7 +333,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -361,10 +361,10 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "name",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "test",
 							},
@@ -372,7 +372,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "location",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "earth",
 							},
@@ -380,7 +380,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "othervalue",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "somethinginteresting",
 							},
@@ -390,7 +390,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -427,10 +427,10 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
+				Attributes: []commonv1.KeyValue{
 					{
 						Key: "name",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "test",
 							},
@@ -438,7 +438,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "location",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "earth",
 							},
@@ -446,7 +446,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 					},
 					{
 						Key: "othervalue",
-						Value: &commonv1.AnyValue{
+						Value: commonv1.AnyValue{
 							Value: &commonv1.AnyValue_StringValue{
 								StringValue: "somethinginteresting",
 							},
@@ -456,7 +456,7 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -486,8 +486,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -519,8 +519,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "payments-service"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "payments-service"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -543,8 +543,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "distributor"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "distributor"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -573,8 +573,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "noisy-service"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "noisy-service"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -603,9 +603,9 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
-					{Key: "env", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "dev"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
+					{Key: "env", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "dev"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -628,8 +628,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -664,9 +664,9 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
-					{Key: "env", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "prod"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "auth-service"}}},
+					{Key: "env", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "prod"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -695,8 +695,8 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 				},
 			},
 			resource: &v1.Resource{
-				Attributes: []*commonv1.KeyValue{
-					{Key: "service.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "any-service"}}},
+				Attributes: []commonv1.KeyValue{
+					{Key: "service.name", Value: commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "any-service"}}},
 				},
 			},
 			span: &tracev1.Span{
@@ -867,9 +867,9 @@ func benchmarkFilterPolicy(b *testing.B, policies []config.FilterPolicy, batch *
 func pushspans(req *tempopb.PushSpansRequest, filter *SpanFilter) int {
 	c := 0
 	for _, rs := range req.Batches {
-		for _, ils := range rs.ScopeSpans {
-			for _, span := range ils.Spans {
-				v := filter.ApplyFilterPolicy(rs.Resource, span)
+		for i := range rs.ScopeSpans {
+			for j := range rs.ScopeSpans[i].Spans {
+				v := filter.ApplyFilterPolicy(&rs.Resource, &rs.ScopeSpans[i].Spans[j])
 				if v {
 					c++
 				}

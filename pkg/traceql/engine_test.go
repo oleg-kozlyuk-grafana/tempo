@@ -127,7 +127,7 @@ func TestEngine_Execute(t *testing.T) {
 				Attributes: []*v1.KeyValue{
 					{
 						Key: "foo",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: "value",
 							},
@@ -135,7 +135,7 @@ func TestEngine_Execute(t *testing.T) {
 					},
 					{
 						Key: "bar",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: "value",
 							},
@@ -150,7 +150,7 @@ func TestEngine_Execute(t *testing.T) {
 				Attributes: []*v1.KeyValue{
 					{
 						Key: "foo",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: "value",
 							},
@@ -158,7 +158,7 @@ func TestEngine_Execute(t *testing.T) {
 					},
 					{
 						Key: "bar",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: "value",
 							},
@@ -266,7 +266,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 				Attributes: []*v1.KeyValue{
 					{
 						Key: "cluster",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: "prod",
 							},
@@ -274,7 +274,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 					},
 					{
 						Key: "count",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_IntValue{
 								IntValue: 5,
 							},
@@ -282,7 +282,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 					},
 					{
 						Key: "count_but_float",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_DoubleValue{
 								DoubleValue: 5.0,
 							},
@@ -290,7 +290,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 					},
 					{
 						Key: "is_ok",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_BoolValue{
 								BoolValue: true,
 							},
@@ -298,7 +298,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 					},
 					{
 						Key: "kind",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: KindClient.String(),
 							},
@@ -306,7 +306,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 					},
 					{
 						Key: "status",
-						Value: &v1.AnyValue{
+						Value: v1.AnyValue{
 							Value: &v1.AnyValue_StringValue{
 								StringValue: StatusOk.String(),
 							},
@@ -324,7 +324,7 @@ func TestEngine_asTraceSearchMetadata(t *testing.T) {
 		Attributes: []*v1.KeyValue{
 			{
 				Key: "avg(duration)",
-				Value: &v1.AnyValue{
+				Value: v1.AnyValue{
 					Value: &v1.AnyValue_DoubleValue{
 						DoubleValue: 15.0,
 					},
@@ -474,46 +474,46 @@ func TestUnixSecToNano(t *testing.T) {
 func TestStatic_AsAnyValue(t *testing.T) {
 	tt := []struct {
 		s        Static
-		expected *v1.AnyValue
+		expected v1.AnyValue
 	}{
-		{NewStaticInt(5), &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 5}}},
-		{NewStaticString("foo"), &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "foo"}}},
-		{NewStaticFloat(5.0), &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 5.0}}},
-		{NewStaticBool(true), &v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
-		{NewStaticDuration(5 * time.Second), &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "5s"}}},
-		{NewStaticStatus(StatusOk), &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "ok"}}},
-		{NewStaticKind(KindInternal), &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "internal"}}},
-		{NewStaticNil(), &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "nil"}}},
+		{NewStaticInt(5), v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 5}}},
+		{NewStaticString("foo"), v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "foo"}}},
+		{NewStaticFloat(5.0), v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 5.0}}},
+		{NewStaticBool(true), v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
+		{NewStaticDuration(5 * time.Second), v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "5s"}}},
+		{NewStaticStatus(StatusOk), v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "ok"}}},
+		{NewStaticKind(KindInternal), v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "internal"}}},
+		{NewStaticNil(), v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "nil"}}},
 		// Test for arrays
 		{
 			NewStaticIntArray([]int{1, 2}),
-			&v1.AnyValue{
+			v1.AnyValue{
 				Value: &v1.AnyValue_ArrayValue{
-					ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{{Value: &v1.AnyValue_IntValue{IntValue: 1}}, {Value: &v1.AnyValue_IntValue{IntValue: 2}}}},
+					ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{{Value: &v1.AnyValue_IntValue{IntValue: 1}}, {Value: &v1.AnyValue_IntValue{IntValue: 2}}}},
 				},
 			},
 		},
 		{
 			NewStaticFloatArray([]float64{1.1, 2.2}),
-			&v1.AnyValue{
+			v1.AnyValue{
 				Value: &v1.AnyValue_ArrayValue{
-					ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}, {Value: &v1.AnyValue_DoubleValue{DoubleValue: 2.2}}}},
+					ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}, {Value: &v1.AnyValue_DoubleValue{DoubleValue: 2.2}}}},
 				},
 			},
 		},
 		{
 			NewStaticStringArray([]string{"foo", "bar"}),
-			&v1.AnyValue{
+			v1.AnyValue{
 				Value: &v1.AnyValue_ArrayValue{
-					ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{{Value: &v1.AnyValue_StringValue{StringValue: "foo"}}, {Value: &v1.AnyValue_StringValue{StringValue: "bar"}}}},
+					ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{{Value: &v1.AnyValue_StringValue{StringValue: "foo"}}, {Value: &v1.AnyValue_StringValue{StringValue: "bar"}}}},
 				},
 			},
 		},
 		{
 			NewStaticBooleanArray([]bool{true, false}),
-			&v1.AnyValue{
+			v1.AnyValue{
 				Value: &v1.AnyValue_ArrayValue{
-					ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{{Value: &v1.AnyValue_BoolValue{BoolValue: true}}, {Value: &v1.AnyValue_BoolValue{BoolValue: false}}}},
+					ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{{Value: &v1.AnyValue_BoolValue{BoolValue: true}}, {Value: &v1.AnyValue_BoolValue{BoolValue: false}}}},
 				},
 			},
 		},

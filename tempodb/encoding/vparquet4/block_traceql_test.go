@@ -1378,7 +1378,7 @@ func flattenForSelectAll(tr *Trace, dcm dedicatedColumnMapping) *traceql.Spanset
 					return
 				}
 				a := traceql.NewScopedAttribute(traceql.AttributeScopeResource, false, attr)
-				s := traceql.StaticFromAnyValue(v)
+				s := traceql.StaticFromAnyValue(*v)
 				rsAttrs = append(rsAttrs, attrVal{a, s})
 			}
 		})
@@ -1435,7 +1435,7 @@ func flattenForSelectAll(tr *Trace, dcm dedicatedColumnMapping) *traceql.Spanset
 							return
 						}
 						a := traceql.NewScopedAttribute(traceql.AttributeScopeSpan, false, attr)
-						s := traceql.StaticFromAnyValue(v)
+						s := traceql.StaticFromAnyValue(*v)
 						newS.addSpanAttr(a, s)
 					}
 				})

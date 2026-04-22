@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/status"
 	"github.com/grafana/dskit/user"
@@ -75,15 +75,14 @@ func (s *mockRoundTripper) RoundTrip(_ pipeline.Request) (*http.Response, error)
 		return errResponse, nil
 	}
 
-	m := jsonpb.Marshaler{}
-	str, err := m.MarshalToString(s.responseFn())
+	b, err := json.Marshal(s.responseFn())
 	if err != nil {
 		panic(err)
 	}
 
 	return &http.Response{
 		StatusCode: 200,
-		Body:       io.NopCloser(bytes.NewReader([]byte(str))),
+		Body:       io.NopCloser(bytes.NewReader(b)),
 	}, nil
 }
 
@@ -252,7 +251,7 @@ func runnerRequests(t *testing.T, f *QueryFrontend) {
 				require.Equal(t, tc.expectedStatusMessage, httpResp.Body.String())
 			}
 			if tc.expectedResponse != nil {
-				err := jsonpb.Unmarshal(httpResp.Body, actualResp)
+				err := json.NewDecoder(httpResp.Body).Decode(actualResp)
 				require.NoError(t, err)
 				require.Equal(t, tc.expectedResponse, actualResp)
 			}
@@ -401,7 +400,7 @@ func TestSearchLimitHonored(t *testing.T) {
 				require.Equal(t, 200, httpResp.Code)
 
 				actualResp := &tempopb.SearchResponse{}
-				err = jsonpb.Unmarshal(httpResp.Body, actualResp)
+				err = json.NewDecoder(httpResp.Body).Decode(actualResp)
 				require.NoError(t, err)
 				require.Len(t, actualResp.Traces, tc.expectedTraces)
 			}
@@ -615,7 +614,7 @@ func TestSearchAccessesCache(t *testing.T) {
 	actualResp := &tempopb.SearchResponse{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// confirm cache key exists and matches the response above
@@ -623,7 +622,7 @@ func TestSearchAccessesCache(t *testing.T) {
 	require.Equal(t, 1, len(bufs))
 
 	actualCache := &tempopb.SearchResponse{}
-	err = jsonpb.Unmarshal(bytes.NewReader(bufs[0]), actualCache)
+	err = json.Unmarshal(bufs[0], actualCache)
 	require.NoError(t, err)
 
 	// zeroing these out b/c they are set by the sharder and won't be in cache
@@ -641,10 +640,10 @@ func TestSearchAccessesCache(t *testing.T) {
 			InspectedBytes: 0, // the cached response will have 0 inspected bytes no matter what value we have here
 		},
 	}
-	overwriteString, err := (&jsonpb.Marshaler{}).MarshalToString(overwriteResp)
+	overwriteBytes, err := json.Marshal(overwriteResp)
 	require.NoError(t, err)
 
-	c.Store(context.Background(), []string{cacheKey}, [][]byte{[]byte(overwriteString)})
+	c.Store(context.Background(), []string{cacheKey}, [][]byte{overwriteBytes})
 
 	respWriter = httptest.NewRecorder()
 	f.SearchHandler.ServeHTTP(respWriter, req)
@@ -655,7 +654,7 @@ func TestSearchAccessesCache(t *testing.T) {
 	actualResp = &tempopb.SearchResponse{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	cacheResponsesEqual(t, overwriteResp, actualResp)
@@ -725,7 +724,7 @@ func TestSearchCachedMetrics(t *testing.T) {
 	actualResp := &tempopb.SearchResponse{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are collected
@@ -747,7 +746,7 @@ func TestSearchCachedMetrics(t *testing.T) {
 	actualResp = &tempopb.SearchResponse{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are 0 because the the response was cached

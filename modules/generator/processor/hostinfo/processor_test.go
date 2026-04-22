@@ -36,8 +36,8 @@ func TestHostInfo(t *testing.T) {
 	}
 
 	for i, b := range req.Batches {
-		b.Resource.Attributes = append(b.Resource.Attributes, []*common_v1.KeyValue{
-			{Key: "host.id", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+		b.Resource.Attributes = append(b.Resource.Attributes, []common_v1.KeyValue{
+			{Key: "host.id", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
 		}...)
 	}
 
@@ -75,12 +75,12 @@ func TestHostInfoHostSource(t *testing.T) {
 
 	for i, b := range req.Batches {
 		if i%2 == 0 {
-			b.Resource.Attributes = append(b.Resource.Attributes, []*common_v1.KeyValue{
-				{Key: "k8s.node.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			b.Resource.Attributes = append(b.Resource.Attributes, []common_v1.KeyValue{
+				{Key: "k8s.node.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
 			}...)
 		}
-		b.Resource.Attributes = append(b.Resource.Attributes, []*common_v1.KeyValue{
-			{Key: "host.id", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+		b.Resource.Attributes = append(b.Resource.Attributes, []common_v1.KeyValue{
+			{Key: "host.id", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
 		}...)
 	}
 

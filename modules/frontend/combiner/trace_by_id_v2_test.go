@@ -2,11 +2,11 @@ package combiner
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/status"
 	"github.com/grafana/tempo/pkg/api"
@@ -54,10 +54,12 @@ func TestNewTraceByIdV2ReturnsAPartialTrace(t *testing.T) {
 	res, err := combiner.HTTPFinal()
 	require.NoError(t, err)
 
-	actualResp := &tempopb.TraceByIDResponse{}
-	err = new(jsonpb.Unmarshaler).Unmarshal(res.Body, actualResp)
+	var jsonResp struct {
+		Status int `json:"status,omitempty"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&jsonResp)
 	require.NoError(t, err)
-	assert.Equal(t, actualResp.Status, tempopb.PartialStatus_PARTIAL)
+	assert.Equal(t, int(tempopb.PartialStatus_PARTIAL), jsonResp.Status)
 }
 
 func TestNewTraceByIdV2ReturnsAPartialTraceOnPartialTraceReturnedByQuerier(t *testing.T) {
@@ -82,10 +84,12 @@ func TestNewTraceByIdV2ReturnsAPartialTraceOnPartialTraceReturnedByQuerier(t *te
 	res, err := combiner.HTTPFinal()
 	require.NoError(t, err)
 
-	actualResp := &tempopb.TraceByIDResponse{}
-	err = new(jsonpb.Unmarshaler).Unmarshal(res.Body, actualResp)
+	var jsonResp struct {
+		Status int `json:"status,omitempty"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&jsonResp)
 	require.NoError(t, err)
-	assert.Equal(t, actualResp.Status, tempopb.PartialStatus_PARTIAL)
+	assert.Equal(t, int(tempopb.PartialStatus_PARTIAL), jsonResp.Status)
 }
 
 func TestTraceByIDV2RedactorHidesTrace(t *testing.T) {
@@ -156,9 +160,10 @@ func TestNewTraceByIDV2(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, api.HeaderAcceptJSON, res.Header.Get(api.HeaderContentType))
 
-		actualResp := &tempopb.TraceByIDResponse{}
-		err = new(jsonpb.Unmarshaler).Unmarshal(res.Body, actualResp)
+		var actualResp map[string]any
+		err = json.NewDecoder(res.Body).Decode(&actualResp)
 		require.NoError(t, err)
+		require.NotEmpty(t, actualResp)
 	})
 	t.Run("returns a combined trace response as protobuff", func(t *testing.T) {
 		combiner := NewTraceByIDV2(100_000, api.HeaderAcceptProtobuf, nil)

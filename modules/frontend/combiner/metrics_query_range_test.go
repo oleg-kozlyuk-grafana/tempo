@@ -131,7 +131,7 @@ func TestQueryRangemaxSeriesShouldQuit(t *testing.T) {
 	start := uint64(1100 * time.Second)
 	end := uint64(1300 * time.Second)
 	step := traceql.DefaultQueryRangeStep(start, end)
-	bar := &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}
+	bar := v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}
 
 	req := &tempopb.QueryRangeRequest{
 		Query:     "{} | rate()",
@@ -250,7 +250,7 @@ func TestQueryRangeMaxSeriesQuitRequiresCompletedShards(t *testing.T) {
 	start := uint64(1100 * time.Second)
 	end := uint64(1300 * time.Second)
 	step := traceql.DefaultQueryRangeStep(start, end)
-	bar := &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}
+	bar := v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}
 
 	req := &tempopb.QueryRangeRequest{
 		Query:     "{} | rate()",
@@ -448,7 +448,7 @@ func ts(samples []tempopb.Sample, exemplars []tempopb.Exemplar, kvs ...string) *
 	for i := 0; i < len(kvs); i += 2 {
 		ts.Labels = append(ts.Labels, v1.KeyValue{
 			Key: kvs[i],
-			Value: &v1.AnyValue{
+			Value: v1.AnyValue{
 				Value: &v1.AnyValue_StringValue{
 					StringValue: kvs[i+1],
 				},

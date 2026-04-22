@@ -193,14 +193,14 @@ func (p *Processor) consume(resourceSpans []*v1_trace.ResourceSpans) (err error)
 					continue
 				}
 
-				if !p.filter.ApplyFilterPolicy(rs.Resource, span) {
-					p.addDroppedSpanSide(span)
+				if !p.filter.ApplyFilterPolicy(&rs.Resource, &span) {
+					p.addDroppedSpanSide(&span)
 					p.filteredSpansCounter.Inc()
 					continue
 				}
 
 				connectionType := store.Unknown
-				spanMultiplier := processor_util.GetSpanMultiplier(p.Cfg.SpanMultiplierKey, span, rs.Resource, p.Cfg.EnableTraceStateSpanMultiplier)
+				spanMultiplier := processor_util.GetSpanMultiplier(p.Cfg.SpanMultiplierKey, &span, &rs.Resource, p.Cfg.EnableTraceStateSpanMultiplier)
 				switch span.Kind {
 				case v1_trace.Span_SPAN_KIND_PRODUCER:
 					// override connection type and continue processing as span kind client
@@ -212,13 +212,13 @@ func (p *Processor) consume(resourceSpans []*v1_trace.ResourceSpans) (err error)
 						e.TraceID = tempo_util.TraceIDToHexString(span.TraceId)
 						e.ConnectionType = connectionType
 						e.ClientService = svcName
-						e.ClientLatencySec = spanDurationSec(span)
+						e.ClientLatencySec = spanDurationSec(&span)
 						e.ClientEndTimeUnixNano = span.EndTimeUnixNano
-						e.Failed = e.Failed || p.spanFailed(span)
+						e.Failed = e.Failed || p.spanFailed(&span)
 						p.upsertDimensions("client_", e.Dimensions, rs.Resource.Attributes, span.Attributes)
 						e.SpanMultiplier = spanMultiplier
 						p.upsertPeerNode(e, span.Attributes)
-						p.upsertDatabaseRequest(e, rs.Resource.Attributes, span)
+						p.upsertDatabaseRequest(e, rs.Resource.Attributes, &span)
 					})
 
 				case v1_trace.Span_SPAN_KIND_CONSUMER:
@@ -231,9 +231,9 @@ func (p *Processor) consume(resourceSpans []*v1_trace.ResourceSpans) (err error)
 						e.TraceID = tempo_util.TraceIDToHexString(span.TraceId)
 						e.ConnectionType = connectionType
 						e.ServerService = svcName
-						e.ServerLatencySec = spanDurationSec(span)
+						e.ServerLatencySec = spanDurationSec(&span)
 						e.ServerStartTimeUnixNano = span.StartTimeUnixNano
-						e.Failed = e.Failed || p.spanFailed(span)
+						e.Failed = e.Failed || p.spanFailed(&span)
 						p.upsertDimensions("server_", e.Dimensions, rs.Resource.Attributes, span.Attributes)
 						e.SpanMultiplier = spanMultiplier
 						p.upsertPeerNode(e, span.Attributes)
@@ -268,7 +268,7 @@ func (p *Processor) consume(resourceSpans []*v1_trace.ResourceSpans) (err error)
 	return nil
 }
 
-func (p *Processor) upsertDimensions(prefix string, m map[string]string, resourceAttr, spanAttr []*v1_common.KeyValue) {
+func (p *Processor) upsertDimensions(prefix string, m map[string]string, resourceAttr, spanAttr []v1_common.KeyValue) {
 	for _, dim := range p.Cfg.Dimensions {
 		if v, ok := processor_util.FindAttributeValue(dim, resourceAttr, spanAttr); ok {
 			if p.Cfg.EnableClientServerPrefix {
@@ -280,7 +280,7 @@ func (p *Processor) upsertDimensions(prefix string, m map[string]string, resourc
 	}
 }
 
-func (p *Processor) upsertPeerNode(e *store.Edge, spanAttr []*v1_common.KeyValue) {
+func (p *Processor) upsertPeerNode(e *store.Edge, spanAttr []v1_common.KeyValue) {
 	for _, peerKey := range p.Cfg.PeerAttributes {
 		if v, ok := processor_util.FindAttributeValue(peerKey, spanAttr); ok {
 			e.PeerNode = v
@@ -298,7 +298,7 @@ func (p *Processor) upsertPeerNode(e *store.Edge, spanAttr []*v1_common.KeyValue
 //	if we have a server.address, use it as the database ServerService
 //	if we have a network.peer.address, use it as the database ServerService.  Include :port if network.peer.port is present
 //	if we have a db.name, use it as the database ServerService, which is the backwards-compatible behavior
-func (p *Processor) upsertDatabaseRequest(e *store.Edge, resourceAttr []*v1_common.KeyValue, span *v1_trace.Span) {
+func (p *Processor) upsertDatabaseRequest(e *store.Edge, resourceAttr []v1_common.KeyValue, span *v1_trace.Span) {
 	var (
 		isDatabase bool
 

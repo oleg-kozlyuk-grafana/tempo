@@ -40,7 +40,7 @@ func generateFakeSearchResponse(probability float64) *tempopb.SearchResponse {
 			for l := range attrs {
 				attrs[l] = &v1.KeyValue{
 					Key: fmt.Sprintf("attr-%d", l),
-					Value: &v1.AnyValue{
+					Value: v1.AnyValue{
 						Value: &v1.AnyValue_StringValue{
 							StringValue: fmt.Sprintf("value-%d", rand.Intn(10)), //nolint:gosec // G404
 						},

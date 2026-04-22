@@ -522,7 +522,7 @@ func searchTag(client httpclient.TempoHTTPClient, seed time.Time, config vulture
 		zap.String("hexID", hexID),
 		zap.Duration("ago", time.Since(seed)),
 		zap.String("key", attr.Key),
-		zap.String("value", util.StringifyAnyValue(attr.Value)),
+		zap.String("value", util.StringifyAnyValue(&attr.Value)),
 	)
 	logger.Info("searching Tempo via search tag")
 
@@ -530,7 +530,7 @@ func searchTag(client httpclient.TempoHTTPClient, seed time.Time, config vulture
 	//  around the seed.
 	start := seed.Add(-30 * time.Minute).Unix()
 	end := seed.Add(30 * time.Minute).Unix()
-	resp, err := client.SearchWithRange(context.Background(), fmt.Sprintf("%s=%s", attr.Key, util.StringifyAnyValue(attr.Value)), start, end)
+	resp, err := client.SearchWithRange(context.Background(), fmt.Sprintf("%s=%s", attr.Key, util.StringifyAnyValue(&attr.Value)), start, end)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to search traces with tag %s: %s", attr.Key, err.Error()))
 		tm.requestFailed++
@@ -571,13 +571,13 @@ func searchTraceql(client httpclient.TempoHTTPClient, seed time.Time, config vul
 		zap.String("hexID", hexID),
 		zap.Duration("ago", time.Since(seed)),
 		zap.String("key", attr.Key),
-		zap.String("value", util.StringifyAnyValue(attr.Value)),
+		zap.String("value", util.StringifyAnyValue(&attr.Value)),
 	)
 	logger.Info("searching Tempo via traceql")
 
 	start := seed.Add(-30 * time.Minute).Unix()
 	end := seed.Add(30 * time.Minute).Unix()
-	resp, err := client.SearchTraceQLWithRange(fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(attr.Value)), start, end)
+	resp, err := client.SearchTraceQLWithRange(fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(&attr.Value)), start, end)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to search traces with traceql %s: %s", attr.Key, err.Error()))
 		tm.requestFailed++
@@ -684,7 +684,7 @@ func queryMetrics(client httpclient.TempoHTTPClient, seed time.Time, config vult
 		zap.String("hexID", hexID),
 		zap.Duration("ago", time.Since(seed)),
 		zap.String("key", attr.Key),
-		zap.String("value", util.StringifyAnyValue(attr.Value)),
+		zap.String("value", util.StringifyAnyValue(&attr.Value)),
 	)
 	logger.Info("searching Tempo via metrics")
 
@@ -693,7 +693,7 @@ func queryMetrics(client httpclient.TempoHTTPClient, seed time.Time, config vult
 	end := seed.Add(30 * time.Minute).Unix()
 
 	resp, err := client.MetricsQueryRange(
-		fmt.Sprintf(`{.%s = "%s"} | count_over_time()`, attr.Key, util.StringifyAnyValue(attr.Value)),
+		fmt.Sprintf(`{.%s = "%s"} | count_over_time()`, attr.Key, util.StringifyAnyValue(&attr.Value)),
 		start, end, "1m", 0,
 	)
 	if err != nil {
@@ -735,7 +735,7 @@ func queryMetrics(client httpclient.TempoHTTPClient, seed time.Time, config vult
 	if config.tempoSearchBackoffDuration == 0 {
 		return tm, nil
 	}
-	searchResp, err := client.SearchTraceQLWithRange(fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(attr.Value)), start, end)
+	searchResp, err := client.SearchTraceQLWithRange(fmt.Sprintf(`{.%s = "%s"}`, attr.Key, util.StringifyAnyValue(&attr.Value)), start, end)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to search traces with traceql %s: %s", attr.Key, err.Error()))
 		tm.requestFailed++

@@ -1,8 +1,8 @@
 package frontend
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +13,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/grafana/dskit/user"
 	"github.com/grafana/tempo/modules/frontend/pipeline"
@@ -37,7 +36,7 @@ func TestQueryRangeHandlerSucceeds(t *testing.T) {
 		Series: []*tempopb.TimeSeries{
 			{
 				Labels: []v1.KeyValue{
-					{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+					{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 				},
 				Samples: []tempopb.Sample{
 					{
@@ -92,7 +91,7 @@ func TestQueryRangeHandlerSucceeds(t *testing.T) {
 		Series: []*tempopb.TimeSeries{
 			{
 				Labels: []v1.KeyValue{
-					{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+					{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 				},
 				Samples: []tempopb.Sample{
 					{
@@ -113,7 +112,7 @@ func TestQueryRangeHandlerSucceeds(t *testing.T) {
 	}
 
 	actualResp := &tempopb.QueryRangeResponse{}
-	err := jsonpb.Unmarshal(httpResp.Body, actualResp)
+	err := json.NewDecoder(httpResp.Body).Decode(actualResp)
 	require.NoError(t, err)
 	require.Equal(t, expectedResp, actualResp)
 }
@@ -136,7 +135,7 @@ func TestQueryRangeAccessesCache(t *testing.T) {
 		Series: []*tempopb.TimeSeries{
 			{
 				Labels: []v1.KeyValue{
-					{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+					{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 				},
 				Samples: []tempopb.Sample{
 					{
@@ -195,7 +194,7 @@ func TestQueryRangeAccessesCache(t *testing.T) {
 	actualResp := &tempopb.QueryRangeResponse{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// confirm cache key exists and matches the response above
@@ -203,7 +202,7 @@ func TestQueryRangeAccessesCache(t *testing.T) {
 	require.Equal(t, 1, len(bufs))
 
 	actualCache := &tempopb.QueryRangeResponse{}
-	err = jsonpb.Unmarshal(bytes.NewReader(bufs[0]), actualCache)
+	err = json.Unmarshal(bufs[0], actualCache)
 	require.NoError(t, err)
 }
 
@@ -216,7 +215,7 @@ func TestQueryRangeHandlerV2MaxSeries(t *testing.T) {
 		Series: []*tempopb.TimeSeries{
 			{
 				Labels: []v1.KeyValue{
-					{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+					{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 				},
 				Samples: []tempopb.Sample{
 					{
@@ -231,7 +230,7 @@ func TestQueryRangeHandlerV2MaxSeries(t *testing.T) {
 			},
 			{
 				Labels: []v1.KeyValue{
-					{Key: "abc", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "xyz"}}},
+					{Key: "abc", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "xyz"}}},
 				},
 				Samples: []tempopb.Sample{
 					{
@@ -278,7 +277,7 @@ func TestQueryRangeHandlerV2MaxSeries(t *testing.T) {
 	require.Equal(t, 200, httpResp.Code)
 
 	actualResp := &tempopb.QueryRangeResponse{}
-	err := jsonpb.Unmarshal(httpResp.Body, actualResp)
+	err := json.NewDecoder(httpResp.Body).Decode(actualResp)
 	require.NoError(t, err)
 	require.Equal(t, maxSeries, len(actualResp.Series))
 	require.Equal(t, tempopb.PartialStatus_PARTIAL, actualResp.Status)
@@ -314,7 +313,7 @@ func TestQueryRangeCachedMetrics(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{
 							{
@@ -357,7 +356,7 @@ func TestQueryRangeCachedMetrics(t *testing.T) {
 	actualResp := &tempopb.QueryRangeResponse{}
 	bytesResp, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are collected
@@ -378,7 +377,7 @@ func TestQueryRangeCachedMetrics(t *testing.T) {
 	actualResp = &tempopb.QueryRangeResponse{}
 	bytesResp, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+	err = json.Unmarshal(bytesResp, actualResp)
 	require.NoError(t, err)
 
 	// verify metrics are 0 because the response was cached
@@ -419,7 +418,7 @@ func TestQueryRangeHandlerWithEndCutoff(t *testing.T) {
 			Series: []*tempopb.TimeSeries{
 				{
 					Labels: []v1.KeyValue{
-						{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+						{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 					},
 					Samples: []tempopb.Sample{
 						{
@@ -498,7 +497,7 @@ func TestQueryRangeHandlerWithEndCutoff(t *testing.T) {
 			actualResp := &tempopb.QueryRangeResponse{}
 			bytesResp, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			err = jsonpb.Unmarshal(bytes.NewReader(bytesResp), actualResp)
+			err = json.Unmarshal(bytesResp, actualResp)
 			require.NoError(t, err)
 
 			require.NotNil(t, rt.req)
@@ -524,7 +523,7 @@ func TestQueryRangeHandlerExemplarNormalization(t *testing.T) {
 		Series: []*tempopb.TimeSeries{
 			{
 				Labels: []v1.KeyValue{
-					{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+					{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 				},
 				Samples: []tempopb.Sample{
 					{TimestampMs: 1100_000, Value: 1},
@@ -566,7 +565,7 @@ func TestQueryRangeHandlerExemplarNormalization(t *testing.T) {
 		require.Equal(t, 200, httpResp.Code)
 
 		actualResp := &tempopb.QueryRangeResponse{}
-		require.NoError(t, jsonpb.Unmarshal(httpResp.Body, actualResp))
+		require.NoError(t, json.NewDecoder(httpResp.Body).Decode(actualResp))
 
 		var total int
 		for _, s := range actualResp.Series {
@@ -588,7 +587,7 @@ func TestQueryRangeHandlerExemplarNormalization(t *testing.T) {
 		require.Equal(t, 200, httpResp.Code)
 
 		actualResp := &tempopb.QueryRangeResponse{}
-		require.NoError(t, jsonpb.Unmarshal(httpResp.Body, actualResp))
+		require.NoError(t, json.NewDecoder(httpResp.Body).Decode(actualResp))
 
 		for _, s := range actualResp.Series {
 			assert.Empty(t, s.Exemplars, "exemplars should be empty when MaxExemplars is disabled")
@@ -608,7 +607,7 @@ func TestQueryRangeHandlerExemplarNormalization(t *testing.T) {
 		require.Equal(t, 200, httpResp.Code)
 
 		actualResp := &tempopb.QueryRangeResponse{}
-		require.NoError(t, jsonpb.Unmarshal(httpResp.Body, actualResp))
+		require.NoError(t, json.NewDecoder(httpResp.Body).Decode(actualResp))
 
 		for _, s := range actualResp.Series {
 			assert.Empty(t, s.Exemplars, "exemplars should be empty when MaxExemplars is zero even if client requests them")
@@ -628,7 +627,7 @@ func TestQueryRangeHandlerExemplarNormalization(t *testing.T) {
 		require.Equal(t, 200, httpResp.Code)
 
 		actualResp := &tempopb.QueryRangeResponse{}
-		require.NoError(t, jsonpb.Unmarshal(httpResp.Body, actualResp))
+		require.NoError(t, json.NewDecoder(httpResp.Body).Decode(actualResp))
 
 		var total int
 		for _, s := range actualResp.Series {

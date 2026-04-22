@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/grafana/dskit/user"
@@ -233,7 +233,11 @@ func TestTraceIDHandler(t *testing.T) {
 
 				trace.SortTrace(tc.expectedTrace)
 				trace.SortTrace(actualResp)
-				assert.True(t, proto.Equal(tc.expectedTrace, actualResp))
+				expectedBytes, err := tc.expectedTrace.Marshal()
+				require.NoError(t, err)
+				actualBytes, err := actualResp.Marshal()
+				require.NoError(t, err)
+				assert.Equal(t, expectedBytes, actualBytes)
 			}
 		})
 	}
@@ -431,7 +435,11 @@ func TestTraceIDHandlerV2(t *testing.T) {
 
 				trace.SortTrace(tc.expectedTrace)
 				trace.SortTrace(actualResp.Trace)
-				assert.True(t, proto.Equal(tc.expectedTrace, actualResp.Trace))
+				expectedBytes, err := tc.expectedTrace.Marshal()
+				require.NoError(t, err)
+				actualBytes, err := actualResp.Trace.Marshal()
+				require.NoError(t, err)
+				assert.Equal(t, expectedBytes, actualBytes)
 			}
 		})
 	}
@@ -485,7 +493,7 @@ func TestTraceIDHandlerV2WithJSONResponse(t *testing.T) {
 	assert.Equal(t, api.HeaderAcceptJSON, resp.Header.Get("Content-Type"))
 
 	actualResp := &tempopb.TraceByIDResponse{}
-	err := new(jsonpb.Unmarshaler).Unmarshal(resp.Body, actualResp)
+	err := json.NewDecoder(resp.Body).Decode(actualResp)
 	require.NoError(t, err)
 }
 

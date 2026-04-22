@@ -81,7 +81,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    3,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
 					},
 				},
 			},
@@ -90,7 +90,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    3,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
 					},
 				},
 			},
@@ -103,7 +103,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    3,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
 					},
 				},
 			},
@@ -112,7 +112,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    5,
 						Spans:      []*tempopb.Span{{SpanID: "span-2"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
 					},
 				},
 			},
@@ -121,7 +121,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    5,
 						Spans:      []*tempopb.Span{{SpanID: "span-2"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
 					},
 				},
 			},
@@ -134,7 +134,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    7,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    5,
 						Spans:      []*tempopb.Span{{SpanID: "span-2"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3}}}},
 					},
 				},
 			},
@@ -152,7 +152,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    7,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
+						Attributes: []*v1.KeyValue{{Key: "avg(test)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1}}}},
 					},
 				},
 			},
@@ -165,12 +165,12 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    7,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
+						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
 					},
 					{
 						Matched:    3,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "by(duration)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}}},
+						Attributes: []*v1.KeyValue{{Key: "by(duration)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}}},
 					},
 				},
 			},
@@ -179,7 +179,7 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    5,
 						Spans:      []*tempopb.Span{{SpanID: "span-2"}},
-						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
+						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
 					},
 				},
 			},
@@ -188,12 +188,12 @@ func TestCombineResults(t *testing.T) {
 					{
 						Matched:    7,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
+						Attributes: []*v1.KeyValue{{Key: "by(name)", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "a"}}}},
 					},
 					{
 						Matched:    3,
 						Spans:      []*tempopb.Span{{SpanID: "span-1"}},
-						Attributes: []*v1.KeyValue{{Key: "by(duration)", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}}},
+						Attributes: []*v1.KeyValue{{Key: "by(duration)", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}}}},
 					},
 				},
 			},

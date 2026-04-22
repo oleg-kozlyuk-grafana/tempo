@@ -1,6 +1,7 @@
 package combiner
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/status"
 	"github.com/grafana/tempo/pkg/api"
@@ -227,7 +227,7 @@ func newTestResponse(t *testing.T) *testPipelineResponse {
 	}
 
 	rec := httptest.NewRecorder()
-	err := (&jsonpb.Marshaler{}).Marshal(rec, serviceStats)
+	err := json.NewEncoder(rec).Encode(serviceStats)
 	require.NoError(t, err)
 
 	return &testPipelineResponse{
@@ -296,10 +296,8 @@ func toHTTPResponseWithFormat(t *testing.T, pb proto.Message, statusCode int, re
 			body, err = proto.Marshal(pb)
 			require.NoError(t, err)
 		} else {
-			m := jsonpb.Marshaler{}
-			bodyStr, marshalErr := m.MarshalToString(pb)
-			require.NoError(t, marshalErr)
-			body = []byte(bodyStr)
+			body, err = json.Marshal(pb)
+			require.NoError(t, err)
 		}
 	}
 
@@ -327,7 +325,7 @@ func fromHTTPResponse(t *testing.T, r *http.Response, pb proto.Message) {
 		err = proto.Unmarshal(body, pb)
 		require.NoError(t, err)
 	} else {
-		err := jsonpb.Unmarshal(r.Body, pb)
+		err := json.NewDecoder(r.Body).Decode(pb)
 		require.NoError(t, err)
 	}
 }

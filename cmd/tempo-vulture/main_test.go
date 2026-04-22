@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -31,9 +30,9 @@ func TestHasMissingSpans(t *testing.T) {
 			&tempopb.Trace{
 				ResourceSpans: []*v1.ResourceSpans{
 					{
-						ScopeSpans: []*v1.ScopeSpans{
+						ScopeSpans: []v1.ScopeSpans{
 							{
-								Spans: []*v1.Span{
+								Spans: []v1.Span{
 									{
 										ParentSpanId: []byte("01234"),
 									},
@@ -49,9 +48,9 @@ func TestHasMissingSpans(t *testing.T) {
 			&tempopb.Trace{
 				ResourceSpans: []*v1.ResourceSpans{
 					{
-						ScopeSpans: []*v1.ScopeSpans{
+						ScopeSpans: []v1.ScopeSpans{
 							{
-								Spans: []*v1.Span{
+								Spans: []v1.Span{
 									{
 										SpanId: []byte("01234"),
 									},
@@ -82,11 +81,9 @@ func TestResponseFixture(t *testing.T) {
 
 	// Regenerate fixture when TEMPO_VULTURE_REGENERATE_TRACE_FIXTURE=1 (e.g. after adding new attributes)
 	if os.Getenv("TEMPO_VULTURE_REGENERATE_TRACE_FIXTURE") == "1" {
-		var jsonTrace bytes.Buffer
-		marshaller := &jsonpb.Marshaler{}
-		err = marshaller.Marshal(&jsonTrace, generatedTrace)
+		jsonTrace, err := json.Marshal(generatedTrace)
 		require.NoError(t, err)
-		require.NoError(t, os.WriteFile("testdata/trace.json", jsonTrace.Bytes(), 0o644))
+		require.NoError(t, os.WriteFile("testdata/trace.json", jsonTrace, 0o644))
 		t.Log("Wrote testdata/trace.json")
 		return
 	}
@@ -96,7 +93,7 @@ func TestResponseFixture(t *testing.T) {
 	defer f.Close()
 
 	expected := &tempopb.Trace{}
-	err = jsonpb.Unmarshal(f, expected)
+	err = json.NewDecoder(f).Decode(expected)
 	require.NoError(t, err)
 
 	assert.True(t, equalTraces(expected, generatedTrace))
@@ -450,7 +447,7 @@ func TestSearchTraceql(t *testing.T) {
 							DurationNanos:     1000000000,
 							Name:              "",
 							Attributes: []*v1_common.KeyValue{
-								{Key: "foo", Value: &v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
+								{Key: "foo", Value: v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
 							},
 						},
 					},
@@ -504,7 +501,7 @@ func TestSearchTag(t *testing.T) {
 							DurationNanos:     1000000000,
 							Name:              "",
 							Attributes: []*v1_common.KeyValue{
-								{Key: "foo", Value: &v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
+								{Key: "foo", Value: v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
 							},
 						},
 					},
@@ -561,7 +558,7 @@ func TestDoSearch(t *testing.T) {
 							DurationNanos:     1000000000,
 							Name:              "",
 							Attributes: []*v1_common.KeyValue{
-								{Key: "foo", Value: &v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
+								{Key: "foo", Value: v1_common.AnyValue{Value: &v1_common.AnyValue_StringValue{StringValue: "Bar"}}},
 							},
 						},
 					},

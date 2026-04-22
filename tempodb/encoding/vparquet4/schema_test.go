@@ -8,9 +8,9 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"reflect"
 
 	"github.com/dustin/go-humanize"
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/parquet-go/parquet-go"
@@ -79,40 +79,40 @@ func TestFieldsAreCleared(t *testing.T) {
 	simpleTrace := &tempopb.Trace{
 		ResourceSpans: []*v1_trace.ResourceSpans{
 			{
-				Resource: &v1_resource.Resource{
-					Attributes: []*v1.KeyValue{
-						{Key: LabelServiceName, Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service1"}}},
-						{Key: "i", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 123.456}}},
+				Resource: v1_resource.Resource{
+					Attributes: []v1.KeyValue{
+						{Key: LabelServiceName, Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service1"}}},
+						{Key: "i", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 123.456}}},
 					},
 				},
-				ScopeSpans: []*v1_trace.ScopeSpans{
+				ScopeSpans: []v1_trace.ScopeSpans{
 					{
-						Scope: &v1.InstrumentationScope{},
-						Spans: []*v1_trace.Span{
+						Scope: v1.InstrumentationScope{},
+						Spans: []v1_trace.Span{
 							{
 								TraceId: traceID,
-								Status: &v1_trace.Status{
+								Status: v1_trace.Status{
 									Code: v1_trace.Status_STATUS_CODE_ERROR,
 								},
-								Attributes: []*v1.KeyValue{
+								Attributes: []v1.KeyValue{
 									// an attribute for every type in order to make sure attributes are reused with different
 									// type combinations
-									{Key: "a", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 11}}},
-									{Key: "b", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
-									{Key: "c", Value: &v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
-									{Key: "d", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 111.11}}},
+									{Key: "a", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 11}}},
+									{Key: "b", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
+									{Key: "c", Value: v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
+									{Key: "d", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 111.11}}},
 								},
-								Events: []*v1_trace.Span_Event{
+								Events: []v1_trace.Span_Event{
 									{
-										Attributes: []*v1.KeyValue{
-											{Key: "event-attr", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
+										Attributes: []v1.KeyValue{
+											{Key: "event-attr", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
 										},
 									},
 								},
-								Links: []*v1_trace.Span_Link{
+								Links: []v1_trace.Span_Link{
 									{
-										Attributes: []*v1.KeyValue{
-											{Key: "link-attr", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
+										Attributes: []v1.KeyValue{
+											{Key: "link-attr", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
 										},
 									},
 								},
@@ -187,45 +187,45 @@ func TestTraceToParquet(t *testing.T) {
 			id:   traceID,
 			trace: tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{{
-					Resource: &v1_resource.Resource{
-						Attributes: []*v1.KeyValue{
-							{Key: "res.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
-							{Key: "service.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
-							{Key: "cluster", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "cluster-a"}}},
-							{Key: "namespace", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "namespace-a"}}},
-							{Key: "pod", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "pod-a"}}},
-							{Key: "container", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "container-a"}}},
-							{Key: "k8s.cluster.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-cluster-a"}}},
-							{Key: "k8s.namespace.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-namespace-a"}}},
-							{Key: "k8s.pod.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-pod-a"}}},
-							{Key: "k8s.container.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-container-a"}}},
-							{Key: "dedicated.resource.1", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-1"}}},
-							{Key: "dedicated.resource.2", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-2"}}},
-							{Key: "dedicated.resource.3", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-3"}}},
-							{Key: "dedicated.resource.4", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-4"}}},
-							{Key: "dedicated.resource.5", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-5"}}},
-							{Key: "res.string.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-								Values: []*v1.AnyValue{
+					Resource: v1_resource.Resource{
+						Attributes: []v1.KeyValue{
+							{Key: "res.attr", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
+							{Key: "service.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
+							{Key: "cluster", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "cluster-a"}}},
+							{Key: "namespace", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "namespace-a"}}},
+							{Key: "pod", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "pod-a"}}},
+							{Key: "container", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "container-a"}}},
+							{Key: "k8s.cluster.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-cluster-a"}}},
+							{Key: "k8s.namespace.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-namespace-a"}}},
+							{Key: "k8s.pod.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-pod-a"}}},
+							{Key: "k8s.container.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "k8s-container-a"}}},
+							{Key: "dedicated.resource.1", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-1"}}},
+							{Key: "dedicated.resource.2", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-2"}}},
+							{Key: "dedicated.resource.3", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-3"}}},
+							{Key: "dedicated.resource.4", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-4"}}},
+							{Key: "dedicated.resource.5", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-resource-attr-value-5"}}},
+							{Key: "res.string.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+								Values: []v1.AnyValue{
 									{Value: &v1.AnyValue_StringValue{StringValue: "one"}},
 									{Value: &v1.AnyValue_StringValue{StringValue: "two"}},
 									{Value: &v1.AnyValue_StringValue{StringValue: "three"}},
 								},
 							}}}},
-							{Key: "res.int.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-								Values: []*v1.AnyValue{
+							{Key: "res.int.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+								Values: []v1.AnyValue{
 									{Value: &v1.AnyValue_IntValue{IntValue: 1}},
 									{Value: &v1.AnyValue_IntValue{IntValue: 2}},
 								},
 							}}}},
-							{Key: "res.double.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-								Values: []*v1.AnyValue{
+							{Key: "res.double.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+								Values: []v1.AnyValue{
 									{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}},
 									{Value: &v1.AnyValue_DoubleValue{DoubleValue: 2.2}},
 									{Value: &v1.AnyValue_DoubleValue{DoubleValue: 3.3}},
 								},
 							}}}},
-							{Key: "res.bool.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-								Values: []*v1.AnyValue{
+							{Key: "res.bool.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+								Values: []v1.AnyValue{
 									{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
 									{Value: &v1.AnyValue_BoolValue{BoolValue: false}},
 									{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
@@ -234,75 +234,75 @@ func TestTraceToParquet(t *testing.T) {
 							}}}},
 						},
 					},
-					ScopeSpans: []*v1_trace.ScopeSpans{{
-						Scope: &v1.InstrumentationScope{
+					ScopeSpans: []v1_trace.ScopeSpans{{
+						Scope: v1.InstrumentationScope{
 							Name:                   "scope-a",
 							Version:                "scope-a-version",
 							DroppedAttributesCount: 101,
-							Attributes: []*v1.KeyValue{
-								{Key: "scope.attr.str", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "scope-val-1"}}},
-								{Key: "scope.attr.int", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 102}}},
-								{Key: "scope.attr.float", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.234}}},
-								{Key: "scope.attr.bool", Value: &v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
-								{Key: "scope.string.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+							Attributes: []v1.KeyValue{
+								{Key: "scope.attr.str", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "scope-val-1"}}},
+								{Key: "scope.attr.int", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 102}}},
+								{Key: "scope.attr.float", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.234}}},
+								{Key: "scope.attr.bool", Value: v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
+								{Key: "scope.string.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_StringValue{StringValue: "one"}},
 										{Value: &v1.AnyValue_StringValue{StringValue: "two"}},
 									},
 								}}}},
 							},
 						},
-						Spans: []*v1_trace.Span{{
+						Spans: []v1_trace.Span{{
 							Name:   "span-a",
 							SpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-							Attributes: []*v1.KeyValue{
-								{Key: "span.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
-								{Key: "http.method", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "POST"}}},
-								{Key: "http.url", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "https://example.com"}}},
-								{Key: "http.status_code", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 201}}},
-								{Key: "dedicated.span.1", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-1"}}},
-								{Key: "dedicated.span.2", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-2"}}},
-								{Key: "dedicated.span.3", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-3"}}},
-								{Key: "dedicated.span.4", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-4"}}},
-								{Key: "dedicated.span.5", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: test.DedicatedBlobTestString()}}},
-								{Key: "span.string.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+							Attributes: []v1.KeyValue{
+								{Key: "span.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
+								{Key: "http.method", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "POST"}}},
+								{Key: "http.url", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "https://example.com"}}},
+								{Key: "http.status_code", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 201}}},
+								{Key: "dedicated.span.1", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-1"}}},
+								{Key: "dedicated.span.2", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-2"}}},
+								{Key: "dedicated.span.3", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-3"}}},
+								{Key: "dedicated.span.4", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "dedicated-span-attr-value-4"}}},
+								{Key: "dedicated.span.5", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: test.DedicatedBlobTestString()}}},
+								{Key: "span.string.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_StringValue{StringValue: "one"}},
 										{Value: &v1.AnyValue_StringValue{StringValue: "two"}},
 									},
 								}}}},
-								{Key: "span.int.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+								{Key: "span.int.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_IntValue{IntValue: 1}},
 										{Value: &v1.AnyValue_IntValue{IntValue: 2}},
 										{Value: &v1.AnyValue_IntValue{IntValue: 3}},
 									},
 								}}}},
-								{Key: "span.double.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+								{Key: "span.double.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_DoubleValue{DoubleValue: 1.1}},
 										{Value: &v1.AnyValue_DoubleValue{DoubleValue: 2.2}},
 									},
 								}}}},
-								{Key: "span.bool.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+								{Key: "span.bool.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
 										{Value: &v1.AnyValue_BoolValue{BoolValue: false}},
 										{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
 										{Value: &v1.AnyValue_BoolValue{BoolValue: false}},
 									},
 								}}}},
-								{Key: "span.unsupported.array", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{
-									Values: []*v1.AnyValue{
+								{Key: "span.unsupported.array", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{
+									Values: []v1.AnyValue{
 										{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
 										{Value: &v1.AnyValue_IntValue{IntValue: 1}},
 										{Value: &v1.AnyValue_BoolValue{BoolValue: true}},
 									},
 								}}}},
-								{Key: "span.unsupported.kvlist", Value: &v1.AnyValue{Value: &v1.AnyValue_KvlistValue{KvlistValue: &v1.KeyValueList{
-									Values: []*v1.KeyValue{
-										{Key: "key-a", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "val-a"}}},
-										{Key: "key-b", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "val-b"}}},
+								{Key: "span.unsupported.kvlist", Value: v1.AnyValue{Value: &v1.AnyValue_KvlistValue{KvlistValue: v1.KeyValueList{
+									Values: []v1.KeyValue{
+										{Key: "key-a", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "val-a"}}},
+										{Key: "key-b", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "val-b"}}},
 									},
 								}}}},
 							},
@@ -396,35 +396,35 @@ func TestTraceToParquet(t *testing.T) {
 			id:   traceID,
 			trace: tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{{
-					Resource: &v1_resource.Resource{
-						Attributes: []*v1.KeyValue{
-							{Key: "service.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
+					Resource: v1_resource.Resource{
+						Attributes: []v1.KeyValue{
+							{Key: "service.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
 						},
 					},
-					ScopeSpans: []*v1_trace.ScopeSpans{{
-						Scope: &v1.InstrumentationScope{},
-						Spans: []*v1_trace.Span{
+					ScopeSpans: []v1_trace.ScopeSpans{{
+						Scope: v1.InstrumentationScope{},
+						Spans: []v1_trace.Span{
 							{
 								Name:   "span-a",
 								SpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-								Attributes: []*v1.KeyValue{
-									{Key: "span.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
+								Attributes: []v1.KeyValue{
+									{Key: "span.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
 								},
 							},
 							{
 								Name:         "span-b",
 								SpanId:       common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02},
 								ParentSpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-								Attributes: []*v1.KeyValue{
-									{Key: "span.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
+								Attributes: []v1.KeyValue{
+									{Key: "span.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
 								},
 							},
 							{
 								Name:         "span-c",
 								SpanId:       common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03},
 								ParentSpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-								Attributes: []*v1.KeyValue{
-									{Key: "span.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "ccc"}}},
+								Attributes: []v1.KeyValue{
+									{Key: "span.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "ccc"}}},
 								},
 							},
 						},
@@ -491,18 +491,18 @@ func TestTraceToParquet(t *testing.T) {
 			id:   traceID,
 			trace: tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{{
-					Resource: &v1_resource.Resource{
-						Attributes: []*v1.KeyValue{
-							{Key: "service.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
+					Resource: v1_resource.Resource{
+						Attributes: []v1.KeyValue{
+							{Key: "service.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
 						},
 					},
-					ScopeSpans: []*v1_trace.ScopeSpans{{
-						Scope: &v1.InstrumentationScope{},
-						Spans: []*v1_trace.Span{
+					ScopeSpans: []v1_trace.ScopeSpans{{
+						Scope: v1.InstrumentationScope{},
+						Spans: []v1_trace.Span{
 							{
 								Name:   "span-a",
 								SpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-								Status: &v1_trace.Status{
+								Status: v1_trace.Status{
 									Code: v1_trace.Status_STATUS_CODE_ERROR,
 								},
 							},
@@ -519,14 +519,14 @@ func TestTraceToParquet(t *testing.T) {
 						},
 					}},
 				}, {
-					Resource: &v1_resource.Resource{
-						Attributes: []*v1.KeyValue{
-							{Key: "service.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-b"}}},
+					Resource: v1_resource.Resource{
+						Attributes: []v1.KeyValue{
+							{Key: "service.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-b"}}},
 						},
 					},
-					ScopeSpans: []*v1_trace.ScopeSpans{{
-						Scope: &v1.InstrumentationScope{},
-						Spans: []*v1_trace.Span{
+					ScopeSpans: []v1_trace.ScopeSpans{{
+						Scope: v1.InstrumentationScope{},
+						Spans: []v1_trace.Span{
 							{
 								Name:         "span-d",
 								SpanId:       common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04},
@@ -536,7 +536,7 @@ func TestTraceToParquet(t *testing.T) {
 								Name:         "span-e",
 								SpanId:       common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05},
 								ParentSpanId: common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04},
-								Status: &v1_trace.Status{
+								Status: v1_trace.Status{
 									Code: v1_trace.Status_STATUS_CODE_ERROR,
 								},
 							},
@@ -626,24 +626,24 @@ func TestTraceToParquet(t *testing.T) {
 			id:   traceID,
 			trace: tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{{
-					Resource: &v1_resource.Resource{
-						Attributes: []*v1.KeyValue{
-							{Key: "service.name", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
+					Resource: v1_resource.Resource{
+						Attributes: []v1.KeyValue{
+							{Key: "service.name", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "service-a"}}},
 						},
 					},
-					ScopeSpans: []*v1_trace.ScopeSpans{{
-						Scope: &v1.InstrumentationScope{},
-						Spans: []*v1_trace.Span{
+					ScopeSpans: []v1_trace.ScopeSpans{{
+						Scope: v1.InstrumentationScope{},
+						Spans: []v1_trace.Span{
 							{
 								Name:              "span-with-link",
 								SpanId:            common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, // 01
 								StartTimeUnixNano: 1500,
 								EndTimeUnixNano:   3000,
-								Links: []*v1_trace.Span_Link{{
+								Links: []v1_trace.Span_Link{{
 									TraceId: traceID,
 									SpanId:  common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02}, // 02
-									Attributes: []*v1.KeyValue{
-										{Key: "link.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
+									Attributes: []v1.KeyValue{
+										{Key: "link.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "aaa"}}},
 									},
 									TraceState: "link trace state",
 								}},
@@ -653,11 +653,11 @@ func TestTraceToParquet(t *testing.T) {
 								SpanId:            common.ID{0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02}, // 02
 								StartTimeUnixNano: 1000,
 								EndTimeUnixNano:   4000,
-								Events: []*v1_trace.Span_Event{{
+								Events: []v1_trace.Span_Event{{
 									TimeUnixNano: 2000,
 									Name:         "event name",
-									Attributes: []*v1.KeyValue{
-										{Key: "event.attr", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
+									Attributes: []v1.KeyValue{
+										{Key: "event.attr", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bbb"}}},
 									},
 								}},
 							},
@@ -767,27 +767,27 @@ func BenchmarkEventToParquet(b *testing.B) {
 	e := &v1_trace.Span_Event{
 		TimeUnixNano: 1000,
 		Name:         "blerg",
-		Attributes: []*v1.KeyValue{
+		Attributes: []v1.KeyValue{
 			// String
-			{Key: "s", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "s2"}}},
+			{Key: "s", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "s2"}}},
 
 			// Int
-			{Key: "i", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
+			{Key: "i", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 123}}},
 
 			// Double
-			{Key: "d", Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 123.456}}},
+			{Key: "d", Value: v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: 123.456}}},
 
 			// Bool
-			{Key: "b", Value: &v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
+			{Key: "b", Value: v1.AnyValue{Value: &v1.AnyValue_BoolValue{BoolValue: true}}},
 
 			// KVList
-			{Key: "kv", Value: &v1.AnyValue{Value: &v1.AnyValue_KvlistValue{KvlistValue: &v1.KeyValueList{Values: []*v1.KeyValue{
-				{Key: "s2", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "s3"}}},
-				{Key: "i2", Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 789}}},
+			{Key: "kv", Value: v1.AnyValue{Value: &v1.AnyValue_KvlistValue{KvlistValue: v1.KeyValueList{Values: []v1.KeyValue{
+				{Key: "s2", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "s3"}}},
+				{Key: "i2", Value: v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: 789}}},
 			}}}}},
 
 			// Array
-			{Key: "a", Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: []*v1.AnyValue{
+			{Key: "a", Value: v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: []v1.AnyValue{
 				{Value: &v1.AnyValue_StringValue{StringValue: "s4"}},
 				{Value: &v1.AnyValue_IntValue{IntValue: 101112}},
 			}}}}},
@@ -960,7 +960,7 @@ func tempopbTraceEqual(t *testing.T, expected, actual *tempopb.Trace) {
 	sortAttributesTempopb(expected)
 	sortAttributesTempopb(actual)
 
-	if !proto.Equal(expected, actual) {
+	if !reflect.DeepEqual(expected, actual) {
 		t.Log(cmp.Diff(expected, actual))
 		assert.Fail(t, "expected and actual are not equal")
 	}
@@ -1026,20 +1026,20 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource: &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{
+						Resource: v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{
 							{
-								Scope: &v1.InstrumentationScope{},
-								Spans: []*v1_trace.Span{
+								Scope: v1.InstrumentationScope{},
+								Spans: []v1_trace.Span{
 									{
 										Name:   "not-root-span",
 										SpanId: []byte{0x02},
-										Links: []*v1_trace.Span_Link{
+										Links: []v1_trace.Span_Link{
 											{
-												Attributes: []*v1.KeyValue{
+												Attributes: []v1.KeyValue{
 													{
 														Key: "opentracing.ref_type",
-														Value: &v1.AnyValue{
+														Value: v1.AnyValue{
 															Value: &v1.AnyValue_StringValue{StringValue: "child_of"},
 														},
 													},
@@ -1069,11 +1069,11 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource: &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{
+						Resource: v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{
 							{
-								Scope: &v1.InstrumentationScope{},
-								Spans: []*v1_trace.Span{
+								Scope: v1.InstrumentationScope{},
+								Spans: []v1_trace.Span{
 									{
 										Name:   "root-span",
 										SpanId: []byte{0x01},
@@ -1096,22 +1096,22 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource: &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{
+						Resource: v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{
 							{
-								Scope: &v1.InstrumentationScope{},
-								Spans: []*v1_trace.Span{
+								Scope: v1.InstrumentationScope{},
+								Spans: []v1_trace.Span{
 									{
 										Name:    "not-root-span",
 										TraceId: traceID,
 										SpanId:  []byte{0x02},
-										Links: []*v1_trace.Span_Link{
+										Links: []v1_trace.Span_Link{
 											{
 												TraceId: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-												Attributes: []*v1.KeyValue{
+												Attributes: []v1.KeyValue{
 													{
 														Key: "opentracing.ref_type",
-														Value: &v1.AnyValue{
+														Value: v1.AnyValue{
 															Value: &v1.AnyValue_StringValue{StringValue: "child_of"},
 														},
 													},
@@ -1143,11 +1143,11 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource: &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{
+						Resource: v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{
 							{
-								Scope: &v1.InstrumentationScope{},
-								Spans: []*v1_trace.Span{
+								Scope: v1.InstrumentationScope{},
+								Spans: []v1_trace.Span{
 									{
 										Name:         "child-span",
 										SpanId:       []byte{0x02},
@@ -1166,8 +1166,8 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource:   &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{},
+						Resource:   v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{},
 					},
 				},
 			},
@@ -1178,11 +1178,11 @@ func TestTraceToParquetRootSpanWithChildOfLink(t *testing.T) {
 			trace: &tempopb.Trace{
 				ResourceSpans: []*v1_trace.ResourceSpans{
 					{
-						Resource: &v1_resource.Resource{},
-						ScopeSpans: []*v1_trace.ScopeSpans{
+						Resource: v1_resource.Resource{},
+						ScopeSpans: []v1_trace.ScopeSpans{
 							{
-								Scope: &v1.InstrumentationScope{},
-								Spans: []*v1_trace.Span{
+								Scope: v1.InstrumentationScope{},
+								Spans: []v1_trace.Span{
 									{
 										Name:         "child-span",
 										SpanId:       []byte{0x02},

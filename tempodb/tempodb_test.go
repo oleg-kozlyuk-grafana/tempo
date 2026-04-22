@@ -15,7 +15,6 @@ import (
 	"github.com/grafana/tempo/tempodb/encoding/vparquet5"
 
 	"github.com/go-kit/log"
-	"github.com/golang/protobuf/proto" //nolint:all
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -120,7 +119,7 @@ func TestDB(t *testing.T) {
 		bFound, failedBlocks, err := r.Find(ctx, testTenantID, id, BlockIDMin, BlockIDMax, 0, 0, common.DefaultSearchOptions())
 		assert.NoError(t, err)
 		assert.Nil(t, failedBlocks)
-		assert.True(t, proto.Equal(bFound[0].Trace, reqs[i]))
+		assert.Equal(t, reqs[i], bFound[0].Trace)
 		require.Greater(t, bFound[0].Metrics.InspectedBytes, uint64(100000))
 	}
 }
@@ -177,7 +176,7 @@ func TestBlockSharding(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, failedBlocks)
 	assert.Greater(t, len(bFound), 0)
-	assert.True(t, proto.Equal(bFound[0].Trace, req))
+	assert.Equal(t, req, bFound[0].Trace)
 	require.Greater(t, bFound[0].Metrics.InspectedBytes, uint64(10000))
 
 	// check if it respects the blockstart/blockend params - case2: miss
@@ -537,7 +536,7 @@ func TestSearchCompactedBlocks(t *testing.T) {
 		bFound, failedBlocks, err := r.Find(ctx, testTenantID, id, blockID, blockID, 0, 0, common.DefaultSearchOptions())
 		require.NoError(t, err)
 		require.Nil(t, failedBlocks)
-		require.True(t, proto.Equal(bFound[0].Trace, reqs[i]))
+		require.Equal(t, reqs[i], bFound[0].Trace)
 		require.Greater(t, bFound[0].Metrics.InspectedBytes, uint64(100000))
 	}
 
@@ -562,7 +561,7 @@ func TestSearchCompactedBlocks(t *testing.T) {
 		bFound, failedBlocks, err := r.Find(ctx, testTenantID, id, blockID, blockID, 0, 0, common.DefaultSearchOptions())
 		require.NoError(t, err)
 		require.Nil(t, failedBlocks)
-		require.True(t, proto.Equal(bFound[0].Trace, reqs[i]))
+		require.Equal(t, reqs[i], bFound[0].Trace)
 		require.Greater(t, bFound[0].Metrics.InspectedBytes, uint64(100000))
 	}
 }
@@ -631,7 +630,7 @@ func testCompleteBlock(t *testing.T, from, to string) {
 		trace.SortTraceAndAttributes(found.Trace)
 
 		// After sorting, the completed block should round-trip the trace exactly.
-		require.True(t, proto.Equal(found.Trace, reqs[i]))
+		require.Equal(t, reqs[i], found.Trace)
 
 		// Check metrics for certain encodings.
 		if to == vparquet4.VersionString || to == vparquet5.VersionString {

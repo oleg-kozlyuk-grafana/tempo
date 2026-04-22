@@ -27,7 +27,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -45,7 +45,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test2",
@@ -63,7 +63,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_CLIENT,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_ERROR,
 				},
 				Name: "test",
@@ -81,7 +81,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_CLIENT,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -98,7 +98,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -115,7 +115,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",
@@ -132,7 +132,7 @@ func TestIntrinsicPolicyMatch_Matches(t *testing.T) {
 			},
 			span: &tracev1.Span{
 				Kind: tracev1.Span_SPAN_KIND_SERVER,
-				Status: &tracev1.Status{
+				Status: tracev1.Status{
 					Code: tracev1.Status_STATUS_CODE_OK,
 				},
 				Name: "test",

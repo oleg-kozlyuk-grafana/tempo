@@ -199,14 +199,14 @@ func BenchmarkPushSpans(b *testing.B) {
 	// Currently this is about 80 active series
 	// TODO - Get more series
 	for i, b := range req.Batches {
-		b.Resource.Attributes = append(b.Resource.Attributes, []*common_v1.KeyValue{
-			{Key: "k8s.cluster.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.namespace.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.node.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.pod.ip", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.pod.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "service.instance.id", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "excluded", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+		b.Resource.Attributes = append(b.Resource.Attributes, []common_v1.KeyValue{
+			{Key: "k8s.cluster.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.namespace.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.node.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.pod.ip", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.pod.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "service.instance.id", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "excluded", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
 		}...)
 	}
 
@@ -329,13 +329,13 @@ func BenchmarkCollect(b *testing.B) {
 	// Currently this is about 80 active series
 	// TODO - Get more series
 	for i, b := range req.Batches {
-		b.Resource.Attributes = append(b.Resource.Attributes, []*common_v1.KeyValue{
-			{Key: "k8s.cluster.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.namespace.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.node.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.pod.ip", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "k8s.pod.name", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
-			{Key: "excluded", Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+		b.Resource.Attributes = append(b.Resource.Attributes, []common_v1.KeyValue{
+			{Key: "k8s.cluster.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.namespace.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.node.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.pod.ip", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "k8s.pod.name", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
+			{Key: "excluded", Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test" + strconv.Itoa(i)}}},
 		}...)
 	}
 	inst.pushSpans(ctx, req)

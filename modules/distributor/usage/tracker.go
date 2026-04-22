@@ -303,7 +303,7 @@ func (u *Tracker) Observe(tenant string, batches []*v1.ResourceSpans) {
 			buffer1[k] = missingLabel
 		}
 
-		if batch.Resource != nil {
+		if len(batch.Resource.Attributes) > 0 || batch.Resource.DroppedAttributesCount > 0 {
 			for _, m := range mapping {
 				// Check ScopeAll first since most users use unscoped attributes (short-circuit optimization)
 				if m.scope == ScopeAll || m.scope == ScopeResource {
@@ -455,7 +455,7 @@ func nonSpanDataLength(batch *v1.ResourceSpans) (int, int) {
 	total := 0
 	spans := 0
 
-	if batch.Resource != nil {
+	if len(batch.Resource.Attributes) > 0 || batch.Resource.DroppedAttributesCount > 0 {
 		sz := batch.Resource.Size()
 		total += sz + protoLengthMath(sz)
 	}
@@ -474,7 +474,7 @@ func nonSpanDataLength(batch *v1.ResourceSpans) (int, int) {
 			total += l + protoLengthMath(l)
 		}
 
-		if ss.Scope != nil {
+		if ss.Scope.Name != "" || len(ss.Scope.Attributes) > 0 {
 			sz := ss.Scope.Size()
 			total += sz + protoLengthMath(sz)
 		}

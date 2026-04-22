@@ -170,8 +170,8 @@ func queryBucketForSummary(ctx context.Context, percentage float32, r backend.Re
 						lastEndTime = span.EndTimeUnixNano
 					}
 					if len(span.ParentSpanId) == 0 {
-						rootSpan = span
-						rootSpanResource = b.Resource
+						rootSpan = &span
+						rootSpanResource = &b.Resource
 					}
 				}
 			}

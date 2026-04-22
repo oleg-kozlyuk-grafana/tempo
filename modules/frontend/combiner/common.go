@@ -2,6 +2,7 @@ package combiner
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"github.com/grafana/tempo/pkg/tempopb"
 	"github.com/grafana/tempo/pkg/util"
 
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/status"
 	"github.com/grafana/tempo/pkg/api"
@@ -119,7 +119,7 @@ func (c *genericCombiner[T]) AddResponse(r PipelineResponse) error {
 		}
 	default:
 		// Assume json
-		if err := jsonpb.Unmarshal(res.Body, partial); err != nil {
+		if err := json.NewDecoder(res.Body).Decode(partial); err != nil {
 			return fmt.Errorf("error unmarshalling response body: %w", err)
 		}
 	}
@@ -311,17 +311,16 @@ func (c *genericCombiner[T]) internalMarshalAs(final T) ([]byte, string, error) 
 		contentType = string(api.MarshallingFormatLLM) + "+json" // postfix the content subtype to indicate its parseable as json
 		// if its unsupported, just fallthrough to marshal as normal json
 		if errors.Is(err, util.ErrUnsupported) {
-			bodyString, err = new(jsonpb.Marshaler).MarshalToString(final)
+			bodyBytes, err = json.Marshal(final)
 			contentType = string(api.MarshallingFormatJSON)
+		} else {
+			bodyBytes = unsafeStringToBytes(bodyString)
 		}
-		bodyBytes = unsafeStringToBytes(bodyString)
 	case api.MarshallingFormatJSON:
 		fallthrough
 	default:
-		var bodyString string
-		bodyString, err = new(jsonpb.Marshaler).MarshalToString(final)
+		bodyBytes, err = json.Marshal(final)
 		contentType = string(api.MarshallingFormatJSON)
-		bodyBytes = unsafeStringToBytes(bodyString)
 	}
 
 	return bodyBytes, contentType, err

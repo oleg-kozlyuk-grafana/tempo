@@ -48,12 +48,20 @@ func NewStrictIntrinsicFilter(intrinsic traceql.Intrinsic, value interface{}) (I
 			if kind, ok := tracev1.Span_SpanKind_value[v]; ok {
 				return NewKindIntrinsicFilter(tracev1.Span_SpanKind(kind)), nil
 			}
+			// Enum map keys are prefixed with the parent type name (e.g. "Span_SPAN_KIND_CLIENT")
+			if kind, ok := tracev1.Span_SpanKind_value["Span_"+v]; ok {
+				return NewKindIntrinsicFilter(tracev1.Span_SpanKind(kind)), nil
+			}
 			return IntrinsicFilter{}, fmt.Errorf("unsupported kind intrinsic string value: %s", v)
 		}
 		return IntrinsicFilter{}, fmt.Errorf("invalid kind intrinsic value: %v", value)
 	case traceql.IntrinsicStatus:
 		if v, ok := value.(string); ok {
 			if code, ok := tracev1.Status_StatusCode_value[v]; ok {
+				return NewStatusIntrinsicFilter(tracev1.Status_StatusCode(code)), nil
+			}
+			// Enum map keys are prefixed with the parent type name (e.g. "Status_STATUS_CODE_OK")
+			if code, ok := tracev1.Status_StatusCode_value["Status_"+v]; ok {
 				return NewStatusIntrinsicFilter(tracev1.Status_StatusCode(code)), nil
 			}
 			return IntrinsicFilter{}, fmt.Errorf("unsupported status intrinsic string value: %s", v)

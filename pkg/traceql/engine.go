@@ -371,37 +371,37 @@ func unixSecToNano(ts uint32) uint64 {
 	return uint64(ts) * uint64(time.Second/time.Nanosecond)
 }
 
-func (s Static) AsAnyValue() *common_v1.AnyValue {
+func (s Static) AsAnyValue() common_v1.AnyValue {
 	switch s.Type {
 	case TypeInt:
 		n, _ := s.Int()
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_IntValue{
 				IntValue: int64(n),
 			},
 		}
 	case TypeFloat:
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_DoubleValue{
 				DoubleValue: s.Float(),
 			},
 		}
 	case TypeBoolean:
 		b, _ := s.Bool()
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_BoolValue{
 				BoolValue: b,
 			},
 		}
 	case TypeDuration:
 		d, _ := s.Duration()
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_StringValue{
 				StringValue: d.String(),
 			},
 		}
 	case TypeString, TypeStatus, TypeNil, TypeKind:
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_StringValue{
 				StringValue: s.EncodeToString(false),
 			},
@@ -412,62 +412,62 @@ func (s Static) AsAnyValue() *common_v1.AnyValue {
 		anyInts := make([]common_v1.AnyValue_IntValue, len(ints))
 		anyVals := make([]common_v1.AnyValue, len(ints))
 		anyArray := common_v1.ArrayValue{
-			Values: make([]*common_v1.AnyValue, len(ints)),
+			Values: make([]common_v1.AnyValue, len(ints)),
 		}
 		for i, n := range ints {
 			anyInts[i].IntValue = int64(n)
 			anyVals[i].Value = &anyInts[i]
-			anyArray.Values[i] = &anyVals[i]
+			anyArray.Values[i] = anyVals[i]
 		}
 
-		return &common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: &anyArray}}
+		return common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: anyArray}}
 	case TypeFloatArray:
 		floats, _ := s.FloatArray()
 
 		anyDouble := make([]common_v1.AnyValue_DoubleValue, len(floats))
 		anyVals := make([]common_v1.AnyValue, len(floats))
 		anyArray := common_v1.ArrayValue{
-			Values: make([]*common_v1.AnyValue, len(floats)),
+			Values: make([]common_v1.AnyValue, len(floats)),
 		}
 		for i, f := range floats {
 			anyDouble[i].DoubleValue = f
 			anyVals[i].Value = &anyDouble[i]
-			anyArray.Values[i] = &anyVals[i]
+			anyArray.Values[i] = anyVals[i]
 		}
 
-		return &common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: &anyArray}}
+		return common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: anyArray}}
 	case TypeStringArray:
 		strs, _ := s.StringArray()
 
 		anyStrs := make([]common_v1.AnyValue_StringValue, len(strs))
 		anyVals := make([]common_v1.AnyValue, len(strs))
 		anyArray := common_v1.ArrayValue{
-			Values: make([]*common_v1.AnyValue, len(strs)),
+			Values: make([]common_v1.AnyValue, len(strs)),
 		}
 		for i, str := range strs {
 			anyStrs[i].StringValue = str
 			anyVals[i].Value = &anyStrs[i]
-			anyArray.Values[i] = &anyVals[i]
+			anyArray.Values[i] = anyVals[i]
 		}
 
-		return &common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: &anyArray}}
+		return common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: anyArray}}
 	case TypeBooleanArray:
 		bools, _ := s.BooleanArray()
 
 		anyBools := make([]common_v1.AnyValue_BoolValue, len(bools))
 		anyVals := make([]common_v1.AnyValue, len(bools))
 		anyArray := common_v1.ArrayValue{
-			Values: make([]*common_v1.AnyValue, len(bools)),
+			Values: make([]common_v1.AnyValue, len(bools)),
 		}
 		for i, b := range bools {
 			anyBools[i].BoolValue = b
 			anyVals[i].Value = &anyBools[i]
-			anyArray.Values[i] = &anyVals[i]
+			anyArray.Values[i] = anyVals[i]
 		}
 
-		return &common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: &anyArray}}
+		return common_v1.AnyValue{Value: &common_v1.AnyValue_ArrayValue{ArrayValue: anyArray}}
 	default:
-		return &common_v1.AnyValue{
+		return common_v1.AnyValue{
 			Value: &common_v1.AnyValue_StringValue{
 				StringValue: fmt.Sprintf("error formatting val: static has unexpected type %v", s.Type),
 			},
@@ -475,7 +475,7 @@ func (s Static) AsAnyValue() *common_v1.AnyValue {
 	}
 }
 
-func StaticFromAnyValue(a *common_v1.AnyValue) Static {
+func StaticFromAnyValue(a common_v1.AnyValue) Static {
 	switch v := a.Value.(type) {
 	case *common_v1.AnyValue_StringValue:
 		return NewStaticString(v.StringValue)

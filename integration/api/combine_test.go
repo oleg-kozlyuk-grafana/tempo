@@ -188,7 +188,7 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 1000, Value: 1.0}},
 					},
@@ -204,7 +204,7 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "baz", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "qux"}}},
+							{Key: "baz", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "qux"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 2000, Value: 2.0}},
 					},
@@ -220,13 +220,13 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "baz", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "qux"}}},
+							{Key: "baz", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "qux"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 2000, Value: 2.0}},
 					},
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 1000, Value: 1.0}},
 					},
@@ -245,7 +245,7 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 2000, Value: 2.0}},
 					},
@@ -261,7 +261,7 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{{TimestampMs: 1000, Value: 1.0}},
 					},
@@ -277,7 +277,7 @@ func TestNaiveQueryRangeCombine(t *testing.T) {
 				Series: []*tempopb.TimeSeries{
 					{
 						Labels: []v1.KeyValue{
-							{Key: "foo", Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
+							{Key: "foo", Value: v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: "bar"}}},
 						},
 						Samples: []tempopb.Sample{
 							{TimestampMs: 1000, Value: 1.0},

@@ -367,8 +367,8 @@ func anyValueToDedicatedColStr(value *v1.AnyValue, buf []string) ([]string, bool
 	case *v1.AnyValue_StringValue:
 		buf = append(buf, value.StringValue)
 	case *v1.AnyValue_ArrayValue:
-		for _, v := range value.ArrayValue.Values {
-			switch v := v.Value.(type) {
+		for i := range value.ArrayValue.Values {
+			switch v := value.ArrayValue.Values[i].Value.(type) {
 			case *v1.AnyValue_StringValue:
 				buf = append(buf, v.StringValue)
 			default:
@@ -395,19 +395,15 @@ func dedicatedColStrToAnyValue(v []string) *v1.AnyValue {
 	default:
 		var (
 			// Build array.
-			// All pointers allocated together for performance.
-			values   = make([]*v1.AnyValue, 0, len(v))
-			allocAny = make([]v1.AnyValue, len(v))
+			values   = make([]v1.AnyValue, len(v))
 			allocStr = make([]v1.AnyValue_StringValue, len(v))
 		)
 		for i, s := range v {
 			anyS := &allocStr[i]
 			anyS.StringValue = s
-			anyV := &allocAny[i]
-			anyV.Value = anyS
-			values = append(values, anyV)
+			values[i].Value = anyS
 		}
-		return &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}}
+		return &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}}
 	}
 }
 
@@ -417,8 +413,8 @@ func anyValueToDedicatedColInt(value *v1.AnyValue, buf []int64) ([]int64, bool) 
 	case *v1.AnyValue_IntValue:
 		buf = append(buf, value.IntValue)
 	case *v1.AnyValue_ArrayValue:
-		for _, v := range value.ArrayValue.Values {
-			switch v := v.Value.(type) {
+		for i := range value.ArrayValue.Values {
+			switch v := value.ArrayValue.Values[i].Value.(type) {
 			case *v1.AnyValue_IntValue:
 				buf = append(buf, v.IntValue)
 			default:
@@ -445,19 +441,15 @@ func dedicatedColIntToAnyValue(v []int64) *v1.AnyValue {
 	default:
 		var (
 			// Build array.
-			// All pointers allocated together for performance.
-			values   = make([]*v1.AnyValue, 0, len(v))
-			allocAny = make([]v1.AnyValue, len(v))
+			values   = make([]v1.AnyValue, len(v))
 			allocInt = make([]v1.AnyValue_IntValue, len(v))
 		)
 		for i, n := range v {
 			anyS := &allocInt[i]
 			anyS.IntValue = n
-			anyV := &allocAny[i]
-			anyV.Value = anyS
-			values = append(values, anyV)
+			values[i].Value = anyS
 		}
 
-		return &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: values}}}
+		return &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: v1.ArrayValue{Values: values}}}
 	}
 }

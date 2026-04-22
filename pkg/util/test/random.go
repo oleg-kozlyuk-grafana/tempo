@@ -13,17 +13,17 @@ import (
 // RandomBatcher is a helper for generating random batches of spans.
 type RandomBatcher struct {
 	stringReceiverChan    chan string
-	attributeReceiverChan chan *v1_common.KeyValue
-	anyvalueReceiverChan  chan *v1_common.AnyValue
-	spanReceiverChan      chan *v1_trace.Span
+	attributeReceiverChan chan v1_common.KeyValue
+	anyvalueReceiverChan  chan v1_common.AnyValue
+	spanReceiverChan      chan v1_trace.Span
 }
 
 func NewRandomBatcher() (*RandomBatcher, context.CancelFunc) {
 	r := &RandomBatcher{
 		stringReceiverChan:    make(chan string, 100),
-		attributeReceiverChan: make(chan *v1_common.KeyValue, 100),
-		anyvalueReceiverChan:  make(chan *v1_common.AnyValue, 100),
-		spanReceiverChan:      make(chan *v1_trace.Span, 100),
+		attributeReceiverChan: make(chan v1_common.KeyValue, 100),
+		anyvalueReceiverChan:  make(chan v1_common.AnyValue, 100),
+		spanReceiverChan:      make(chan v1_trace.Span, 100),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,11 +38,11 @@ func NewRandomBatcher() (*RandomBatcher, context.CancelFunc) {
 
 func (r *RandomBatcher) GenerateBatch(spanCount int64) *v1_trace.ResourceSpans {
 	batch := &v1_trace.ResourceSpans{
-		Resource: &v1_resource.Resource{
-			Attributes: []*v1_common.KeyValue{
+		Resource: v1_resource.Resource{
+			Attributes: []v1_common.KeyValue{
 				{
 					Key: "service.name",
-					Value: &v1_common.AnyValue{
+					Value: v1_common.AnyValue{
 						Value: &v1_common.AnyValue_StringValue{
 							StringValue: "test-service",
 						},
@@ -54,12 +54,12 @@ func (r *RandomBatcher) GenerateBatch(spanCount int64) *v1_trace.ResourceSpans {
 
 	for i := int64(0); i < spanCount; i++ {
 		s := <-r.spanReceiverChan
-		batch.ScopeSpans = append(batch.ScopeSpans, &v1_trace.ScopeSpans{
-			Scope: &v1_common.InstrumentationScope{
+		batch.ScopeSpans = append(batch.ScopeSpans, v1_trace.ScopeSpans{
+			Scope: v1_common.InstrumentationScope{
 				Name:    "super library",
 				Version: "0.0.1",
 			},
-			Spans: []*v1_trace.Span{
+			Spans: []v1_trace.Span{
 				s,
 			},
 		})
@@ -83,7 +83,7 @@ func (r *RandomBatcher) randomSpanGenerator(ctx context.Context) {
 			return
 		default:
 
-			attributes := []*v1_common.KeyValue{}
+			attributes := []v1_common.KeyValue{}
 
 			for i := 0; i < length; i++ {
 				attributes = append(attributes, <-r.attributeReceiverChan)
@@ -91,7 +91,7 @@ func (r *RandomBatcher) randomSpanGenerator(ctx context.Context) {
 
 			now := time.Now()
 
-			span := &v1_trace.Span{
+			span := v1_trace.Span{
 				TraceId:           []byte("12345678901234567890123456789012"),
 				SpanId:            []byte("1234567890123456"),
 				ParentSpanId:      []byte("1234567890123456"),
@@ -122,7 +122,7 @@ func (r *RandomBatcher) randomSpanGenerator(ctx context.Context) {
 func (r *RandomBatcher) randomAnyValueGenerator(ctx context.Context) {
 	rr := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	var anyValue *v1_common.AnyValue
+	var anyValue v1_common.AnyValue
 
 	for {
 		select {
@@ -132,25 +132,25 @@ func (r *RandomBatcher) randomAnyValueGenerator(ctx context.Context) {
 
 			switch rr.Intn(4) {
 			case 0:
-				anyValue = &v1_common.AnyValue{
+				anyValue = v1_common.AnyValue{
 					Value: &v1_common.AnyValue_StringValue{
 						StringValue: <-r.stringReceiverChan,
 					},
 				}
 			case 1:
-				anyValue = &v1_common.AnyValue{
+				anyValue = v1_common.AnyValue{
 					Value: &v1_common.AnyValue_BoolValue{
 						BoolValue: bool(rr.Intn(2) == 1),
 					},
 				}
 			case 2:
-				anyValue = &v1_common.AnyValue{
+				anyValue = v1_common.AnyValue{
 					Value: &v1_common.AnyValue_IntValue{
 						IntValue: int64(rr.Intn(1000000000)),
 					},
 				}
 			case 3:
-				anyValue = &v1_common.AnyValue{
+				anyValue = v1_common.AnyValue{
 					Value: &v1_common.AnyValue_DoubleValue{
 						DoubleValue: rr.Float64(),
 					},
@@ -168,7 +168,7 @@ func (r *RandomBatcher) randomSpanAttributeGenerator(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			attr := &v1_common.KeyValue{
+			attr := v1_common.KeyValue{
 				Key:   <-r.stringReceiverChan,
 				Value: <-r.anyvalueReceiverChan,
 			}

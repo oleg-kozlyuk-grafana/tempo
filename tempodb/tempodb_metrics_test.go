@@ -1123,12 +1123,12 @@ func TestTempoDBQueryRange(t *testing.T) {
 		tr := &tempopb.Trace{
 			ResourceSpans: []*v1.ResourceSpans{
 				{
-					Resource: &resource_v1.Resource{
-						Attributes: []*common_v1.KeyValue{tempopb.MakeKeyValueStringPtr("service.name", svcName)},
+					Resource: resource_v1.Resource{
+						Attributes: []common_v1.KeyValue{tempopb.MakeKeyValueString("service.name", svcName)},
 					},
-					ScopeSpans: []*v1.ScopeSpans{
+					ScopeSpans: []v1.ScopeSpans{
 						{
-							Spans: []*v1.Span{
+							Spans: []v1.Span{
 								sp,
 							},
 						},

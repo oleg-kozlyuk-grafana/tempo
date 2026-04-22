@@ -127,10 +127,8 @@ func traceByIDResponseToSimplifiedJSON(t *tempopb.TraceByIDResponse) (string, er
 		scopes := make([]LLMScope, 0, len(rs.ScopeSpans))
 		for _, ss := range rs.ScopeSpans {
 			scope := LLMScope{}
-			if ss.Scope != nil {
-				scope.Name = ss.Scope.Name
-				scope.Version = ss.Scope.Version
-			}
+			scope.Name = ss.Scope.Name
+			scope.Version = ss.Scope.Version
 
 			// Build spans array
 			spans := make([]LLMSpan, 0, len(ss.Spans))
@@ -174,7 +172,7 @@ func traceByIDResponseToSimplifiedJSON(t *tempopb.TraceByIDResponse) (string, er
 	return string(data), nil
 }
 
-func simplifySpan(span *tracev1.Span) LLMSpan {
+func simplifySpan(span tracev1.Span) LLMSpan {
 	result := LLMSpan{
 		SpanID: bytesToHex(span.SpanId),
 		Name:   span.Name,
@@ -244,7 +242,7 @@ func simplifySpan(span *tracev1.Span) LLMSpan {
 	}
 
 	// Add status
-	if span.Status != nil && span.Status.Code != tracev1.Status_STATUS_CODE_UNSET {
+	if span.Status.Code != tracev1.Status_STATUS_CODE_UNSET {
 		result.Status = LLMStatus{
 			Code:    span.Status.Code.String(),
 			Message: span.Status.Message,
@@ -252,7 +250,7 @@ func simplifySpan(span *tracev1.Span) LLMSpan {
 	} else {
 		// Default empty status
 		result.Status = LLMStatus{
-			Code:    "STATUS_CODE_UNSET",
+			Code:    tracev1.Status_STATUS_CODE_UNSET.String(),
 			Message: "",
 		}
 	}
@@ -260,19 +258,20 @@ func simplifySpan(span *tracev1.Span) LLMSpan {
 	return result
 }
 
-// flattenAttributes converts []*KeyValue to a flat map[string]interface{}
-func flattenAttributes(attrs []*commonv1.KeyValue) map[string]interface{} {
+// flattenAttributes converts []KeyValue to a flat map[string]interface{}
+func flattenAttributes(attrs []commonv1.KeyValue) map[string]interface{} {
 	result := make(map[string]interface{})
-	for _, attr := range attrs {
-		if attr.Value != nil {
-			result[attr.Key] = extractAnyValue(attr.Value)
-		}
+	for i := range attrs {
+		result[attrs[i].Key] = extractAnyValue(&attrs[i].Value)
 	}
 	return result
 }
 
 // extractAnyValue extracts the actual value from an AnyValue wrapper
 func extractAnyValue(av *commonv1.AnyValue) interface{} {
+	if av == nil {
+		return nil
+	}
 	switch v := av.Value.(type) {
 	case *commonv1.AnyValue_StringValue:
 		return v.StringValue
@@ -285,18 +284,12 @@ func extractAnyValue(av *commonv1.AnyValue) interface{} {
 	case *commonv1.AnyValue_BytesValue:
 		return hex.EncodeToString(v.BytesValue)
 	case *commonv1.AnyValue_ArrayValue:
-		if v.ArrayValue == nil {
-			return []interface{}{}
-		}
 		arr := make([]interface{}, 0, len(v.ArrayValue.Values))
-		for _, item := range v.ArrayValue.Values {
-			arr = append(arr, extractAnyValue(item))
+		for i := range v.ArrayValue.Values {
+			arr = append(arr, extractAnyValue(&v.ArrayValue.Values[i]))
 		}
 		return arr
 	case *commonv1.AnyValue_KvlistValue:
-		if v.KvlistValue == nil {
-			return map[string]interface{}{}
-		}
 		return flattenAttributes(v.KvlistValue.Values)
 	default:
 		return nil

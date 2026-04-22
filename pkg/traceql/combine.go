@@ -1,13 +1,16 @@
 package traceql
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/grafana/tempo/pkg/tempopb"
+	v1 "github.com/grafana/tempo/pkg/tempopb/common/v1"
 	"github.com/grafana/tempo/pkg/util"
 )
 
@@ -311,11 +314,30 @@ func spansetID(ss *tempopb.SpanSet) string {
 	for _, s := range ss.Attributes {
 		// any attributes that start with "by" are considered to be part of the spanset identity
 		if strings.HasPrefix(s.Key, "by") {
-			id += s.Key + s.Value.String()
+			id += s.Key + "=" + attributeValueString(&s.Value)
 		}
 	}
 
 	return id
+}
+
+// attributeValueString returns a deterministic string representation of an AnyValue.
+func attributeValueString(v *v1.AnyValue) string {
+	if v == nil {
+		return ""
+	}
+	switch val := v.Value.(type) {
+	case *v1.AnyValue_StringValue:
+		return val.StringValue
+	case *v1.AnyValue_IntValue:
+		return strconv.FormatInt(val.IntValue, 10)
+	case *v1.AnyValue_DoubleValue:
+		return strconv.FormatFloat(val.DoubleValue, 'f', -1, 64)
+	case *v1.AnyValue_BoolValue:
+		return strconv.FormatBool(val.BoolValue)
+	default:
+		return fmt.Sprintf("%v", v.Value)
+	}
 }
 
 type QueryRangeCombiner struct {

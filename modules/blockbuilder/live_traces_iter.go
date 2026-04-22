@@ -121,7 +121,8 @@ func (i *liveTracesIter) iter(ctx context.Context) {
 
 			// Deduplicate spans and update block timestamp bounds in one pass.
 			for _, rs := range tr.ResourceSpans {
-				for _, ss := range rs.ScopeSpans {
+				for ssIdx := range rs.ScopeSpans {
+					ss := &rs.ScopeSpans[ssIdx]
 					unique := ss.Spans[:0]
 					for _, s := range ss.Spans {
 						token := util.TokenForID(h, buffer, int32(s.Kind), s.SpanId)

@@ -2881,7 +2881,7 @@ func TestSimpleAggregatorExemplarLimit(t *testing.T) {
 			}
 
 			agg.Combine([]*tempopb.TimeSeries{{
-				Labels:    []commonv1proto.KeyValue{{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}}},
+				Labels:    []commonv1proto.KeyValue{{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}}},
 				Samples:   []tempopb.Sample{{TimestampMs: int64(startMs), Value: 1.0}}, //nolint: gosec // G115
 				Exemplars: exemplars,
 			}})
@@ -3199,7 +3199,7 @@ func generateTestTimeSeries(seriesCount, samplesCount, exemplarCount int, start,
 		labels := []commonv1proto.KeyValue{
 			{
 				Key: "service",
-				Value: &commonv1proto.AnyValue{
+				Value: commonv1proto.AnyValue{
 					Value: &commonv1proto.AnyValue_StringValue{
 						StringValue: "service-" + fmt.Sprintf("%d", i),
 					},
@@ -3207,7 +3207,7 @@ func generateTestTimeSeries(seriesCount, samplesCount, exemplarCount int, start,
 			},
 			{
 				Key: internalLabelBucket,
-				Value: &commonv1proto.AnyValue{
+				Value: commonv1proto.AnyValue{
 					Value: &commonv1proto.AnyValue_DoubleValue{
 						DoubleValue: math.Pow(2, float64(i%20)), // Power of 2 as bucket
 					},
@@ -3235,7 +3235,7 @@ func generateTestTimeSeries(seriesCount, samplesCount, exemplarCount int, start,
 			exemplarLabels := []commonv1proto.KeyValue{
 				{
 					Key: "trace_id",
-					Value: &commonv1proto.AnyValue{
+					Value: commonv1proto.AnyValue{
 						Value: &commonv1proto.AnyValue_StringValue{
 							StringValue: fmt.Sprintf("trace-%d", i*1000+j),
 						},
@@ -3243,7 +3243,7 @@ func generateTestTimeSeries(seriesCount, samplesCount, exemplarCount int, start,
 				},
 				{
 					Key: "span_id",
-					Value: &commonv1proto.AnyValue{
+					Value: commonv1proto.AnyValue{
 						Value: &commonv1proto.AnyValue_StringValue{
 							StringValue: fmt.Sprintf("span-%d", j),
 						},
@@ -3288,8 +3288,8 @@ func TestHistogramAggregator_ExemplarBucketSelection(t *testing.T) {
 			timeSeries: []*tempopb.TimeSeries{
 				{
 					Labels: []commonv1proto.KeyValue{
-						{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-						{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 1.0}}},
+						{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+						{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 1.0}}},
 					},
 					Samples: []tempopb.Sample{
 						{TimestampMs: time.Unix(0, int64(req.Start)).UnixMilli(), Value: 5}, // 5 samples in 1s bucket (p50)
@@ -3297,7 +3297,7 @@ func TestHistogramAggregator_ExemplarBucketSelection(t *testing.T) {
 					Exemplars: []tempopb.Exemplar{
 						{
 							Labels: []commonv1proto.KeyValue{
-								{Key: "trace_id", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "trace1"}}},
+								{Key: "trace_id", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "trace1"}}},
 							},
 							Value:       0.8, // Should go to p50 (< quantile threshold)
 							TimestampMs: time.Unix(0, int64(req.Start)).UnixMilli(),
@@ -3306,8 +3306,8 @@ func TestHistogramAggregator_ExemplarBucketSelection(t *testing.T) {
 				},
 				{
 					Labels: []commonv1proto.KeyValue{
-						{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-						{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 4.0}}},
+						{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+						{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 4.0}}},
 					},
 					Samples: []tempopb.Sample{
 						{TimestampMs: time.Unix(0, int64(req.Start)).UnixMilli(), Value: 1}, // 1 sample in 4s bucket (p90)
@@ -3315,7 +3315,7 @@ func TestHistogramAggregator_ExemplarBucketSelection(t *testing.T) {
 					Exemplars: []tempopb.Exemplar{
 						{
 							Labels: []commonv1proto.KeyValue{
-								{Key: "trace_id", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "trace2"}}},
+								{Key: "trace_id", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "trace2"}}},
 							},
 							Value:       3.5, // Should go to p90 (> quantile threshold)
 							TimestampMs: time.Unix(0, int64(req.Start)).UnixMilli(),
@@ -3367,8 +3367,8 @@ func TestHistogramAggregator_ExemplarDistribution(t *testing.T) {
 	timeSeries := []*tempopb.TimeSeries{
 		{
 			Labels: []commonv1proto.KeyValue{
-				{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-				{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
+				{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+				{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
 			},
 			Samples: []tempopb.Sample{
 				{TimestampMs: baseTime.UnixMilli(), Value: 10},
@@ -3489,8 +3489,8 @@ func TestHistogramAggregator_EdgeCases(t *testing.T) {
 			timeSeries: []*tempopb.TimeSeries{
 				{
 					Labels: []commonv1proto.KeyValue{
-						{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-						{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
+						{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+						{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
 					},
 					Samples: []tempopb.Sample{
 						{TimestampMs: baseTime.UnixMilli(), Value: 5},
@@ -3510,8 +3510,8 @@ func TestHistogramAggregator_EdgeCases(t *testing.T) {
 			timeSeries: []*tempopb.TimeSeries{
 				{
 					Labels: []commonv1proto.KeyValue{
-						{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-						{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
+						{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+						{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: 2.0}}},
 					},
 					Samples: []tempopb.Sample{
 						{TimestampMs: baseTime.UnixMilli(), Value: 5},
@@ -3556,8 +3556,8 @@ func createBucketSeries(bucketValue string, count int, timestampMs int64) *tempo
 	bucketFloat, _ := strconv.ParseFloat(bucketValue, 64)
 	return &tempopb.TimeSeries{
 		Labels: []commonv1proto.KeyValue{
-			{Key: "service", Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
-			{Key: internalLabelBucket, Value: &commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: bucketFloat}}},
+			{Key: "service", Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_StringValue{StringValue: "test"}}},
+			{Key: internalLabelBucket, Value: commonv1proto.AnyValue{Value: &commonv1proto.AnyValue_DoubleValue{DoubleValue: bucketFloat}}},
 		},
 		Samples: []tempopb.Sample{
 			{TimestampMs: timestampMs, Value: float64(count)},

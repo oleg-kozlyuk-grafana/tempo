@@ -7,6 +7,9 @@ import (
 )
 
 func StringifyAnyValue(anyValue *v1common.AnyValue) string {
+	if anyValue == nil {
+		return ""
+	}
 	switch anyValue.Value.(type) {
 	case *v1common.AnyValue_BoolValue:
 		return strconv.FormatBool(anyValue.GetBoolValue())
@@ -14,8 +17,9 @@ func StringifyAnyValue(anyValue *v1common.AnyValue) string {
 		return strconv.FormatInt(anyValue.GetIntValue(), 10)
 	case *v1common.AnyValue_ArrayValue:
 		arrStr := "["
-		for _, v := range anyValue.GetArrayValue().Values {
-			arrStr += StringifyAnyValue(v)
+		av := anyValue.GetArrayValue()
+		for i := range av.Values {
+			arrStr += StringifyAnyValue(&av.Values[i])
 		}
 		arrStr += "]"
 		return arrStr
@@ -23,8 +27,9 @@ func StringifyAnyValue(anyValue *v1common.AnyValue) string {
 		return strconv.FormatFloat(anyValue.GetDoubleValue(), 'f', -1, 64)
 	case *v1common.AnyValue_KvlistValue:
 		mapStr := "{"
-		for _, kv := range anyValue.GetKvlistValue().Values {
-			mapStr += kv.Key + ":" + StringifyAnyValue(kv.Value)
+		kvl := anyValue.GetKvlistValue()
+		for i := range kvl.Values {
+			mapStr += kvl.Values[i].Key + ":" + StringifyAnyValue(&kvl.Values[i].Value)
 		}
 		mapStr += "}"
 		return mapStr

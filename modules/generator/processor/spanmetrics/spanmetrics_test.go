@@ -87,10 +87,10 @@ func TestSpanMetricsTargetInfoEnabled(t *testing.T) {
 	defer p.Shutdown(context.Background())
 
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
-	batch := test.MakeBatchWithAttributes(10, nil, []*common_v1.KeyValue{
+	batch := test.MakeBatchWithAttributes(10, nil, []common_v1.KeyValue{
 		{
 			Key: "job",
-			Value: &common_v1.AnyValue{
+			Value: common_v1.AnyValue{
 				Value: &common_v1.AnyValue_StringValue{
 					StringValue: "dummy-job",
 				},
@@ -98,7 +98,7 @@ func TestSpanMetricsTargetInfoEnabled(t *testing.T) {
 		},
 		{
 			Key: "service.instance.id",
-			Value: &common_v1.AnyValue{
+			Value: common_v1.AnyValue{
 				Value: &common_v1.AnyValue_StringValue{
 					StringValue: "instance",
 				},
@@ -106,7 +106,7 @@ func TestSpanMetricsTargetInfoEnabled(t *testing.T) {
 		},
 		{
 			Key: "instance",
-			Value: &common_v1.AnyValue{
+			Value: common_v1.AnyValue{
 				Value: &common_v1.AnyValue_StringValue{
 					StringValue: "dummy-instance",
 				},
@@ -235,15 +235,15 @@ func TestSpanMetrics_dimensions(t *testing.T) {
 			defer p.Shutdown(context.Background())
 
 			batch := test.MakeBatch(10, nil)
-			for _, rs := range batch.ScopeSpans {
-				for _, s := range rs.Spans {
-					s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			for i := range batch.ScopeSpans {
+				for j := range batch.ScopeSpans[i].Spans {
+					batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 						Key:   "foo",
-						Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
+						Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
 					})
-					s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+					batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 						Key:   "bar",
-						Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
+						Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
 					})
 				}
 			}
@@ -280,15 +280,15 @@ func TestSpanMetrics_collisions(t *testing.T) {
 	defer p.Shutdown(context.Background())
 
 	batch := test.MakeBatch(10, nil)
-	for _, rs := range batch.ScopeSpans {
-		for _, s := range rs.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "span.kind",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "colliding_kind"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "colliding_kind"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "span_name",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "colliding_name"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "colliding_name"}},
 			})
 		}
 	}
@@ -331,14 +331,14 @@ func TestJobLabelWithNamespaceAndInstanceID(t *testing.T) {
 
 	// add namespace
 
-	batch.Resource.Attributes = append(batch.Resource.Attributes, &common_v1.KeyValue{
+	batch.Resource.Attributes = append(batch.Resource.Attributes, common_v1.KeyValue{
 		Key:   "service.namespace",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
 	})
 
-	batch.Resource.Attributes = append(batch.Resource.Attributes, &common_v1.KeyValue{
+	batch.Resource.Attributes = append(batch.Resource.Attributes, common_v1.KeyValue{
 		Key:   "service.instance.id",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 	})
 
 	p.PushSpans(context.Background(), &tempopb.PushSpansRequest{Batches: []*trace_v1.ResourceSpans{batch}})
@@ -462,16 +462,16 @@ func TestSpanMetrics_applyFilterPolicy(t *testing.T) {
 			batch := test.MakeBatch(10, nil)
 
 			// Add some attributes
-			for _, rs := range batch.ScopeSpans {
-				for _, s := range rs.Spans {
-					s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			for i := range batch.ScopeSpans {
+				for j := range batch.ScopeSpans[i].Spans {
+					batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 						Key:   "foo",
-						Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
+						Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
 					})
 
-					s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+					batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 						Key:   "bar",
-						Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
+						Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
 					})
 				}
 			}
@@ -533,9 +533,9 @@ func TestJobLabelWithNamespaceAndNoServiceName(t *testing.T) {
 	copy(batch.Resource.Attributes[serviceNameIndex:], batch.Resource.Attributes[serviceNameIndex+1:])
 	batch.Resource.Attributes = batch.Resource.Attributes[:len(batch.Resource.Attributes)-1]
 
-	batch.Resource.Attributes = append(batch.Resource.Attributes, &common_v1.KeyValue{
+	batch.Resource.Attributes = append(batch.Resource.Attributes, common_v1.KeyValue{
 		Key:   "service.namespace",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
 	})
 
 	p.PushSpans(context.Background(), &tempopb.PushSpansRequest{Batches: []*trace_v1.ResourceSpans{batch}})
@@ -582,14 +582,14 @@ func TestLabelsWithDifferentBatches(t *testing.T) {
 
 	// batch 2 will have namespace and instance id
 	// this will create another set of metrics with job=<service.namespace>/<service.name> and instance=<service.instance.id>
-	batch2.Resource.Attributes = append(batch2.Resource.Attributes, &common_v1.KeyValue{
+	batch2.Resource.Attributes = append(batch2.Resource.Attributes, common_v1.KeyValue{
 		Key:   "service.namespace",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-namespace"}},
 	})
 
-	batch2.Resource.Attributes = append(batch2.Resource.Attributes, &common_v1.KeyValue{
+	batch2.Resource.Attributes = append(batch2.Resource.Attributes, common_v1.KeyValue{
 		Key:   "service.instance.id",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 	})
 
 	batch3 := test.MakeBatch(10, nil)
@@ -654,25 +654,25 @@ func TestTargetInfoEnabled(t *testing.T) {
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add additional source attributes
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 		{
 			Key:   "ip",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 		},
 	}
 
@@ -707,25 +707,25 @@ func TestTargetInfoDisabled(t *testing.T) {
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add additional source attributes
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 		{
 			Key:   "ip",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 		},
 	}
 
@@ -755,22 +755,22 @@ func TestTargetInfoWithEmptyKey(t *testing.T) {
 
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		{
 			Key:   "", // add empty key attribute (should be skipped)
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-be-skipped"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-be-skipped"}},
 		},
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		{
 			Key:   "cluster", // At least one extra attribute is required to get target_info
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
 
@@ -808,18 +808,18 @@ func TestTargetInfoWithEmptyValue(t *testing.T) {
 
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		{
 			Key:   "host.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}}, // empty value
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}}, // empty value
 		},
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
 
@@ -852,22 +852,22 @@ func TestTargetInfoWithAllEmptyValues(t *testing.T) {
 
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id"}},
 		},
 		{
 			Key:   "host.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}},
 		},
 		{
 			Key:   "container.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: ""}},
 		},
 	}
 
@@ -902,34 +902,34 @@ func TestTargetInfoWithExclusion(t *testing.T) {
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add additional source attributes
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 		{
 			Key:   "ip",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 		},
 		// add attribute for labels that we want to drop
 		{
 			Key:   "container",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		{
 			Key:   "container.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "xyz123"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "xyz123"}},
 		},
 	}
 
@@ -966,25 +966,25 @@ func TestTargetInfoSanitizeLabelName(t *testing.T) {
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add additional source attributes
 		{
 			Key:   "cluster-id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 		{
 			Key:   "target.ip",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 		},
 	}
 
@@ -1021,16 +1021,16 @@ func TestTargetInfoWithJobAndInstanceOnly(t *testing.T) {
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
 
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 	}
 
@@ -1074,14 +1074,14 @@ func TestTargetInfoNoJobAndNoInstance(t *testing.T) {
 	batch.Resource.Attributes = batch.Resource.Attributes[:len(batch.Resource.Attributes)-1]
 
 	// add additional source attributes
-	batch.Resource.Attributes = append(batch.Resource.Attributes, &common_v1.KeyValue{
+	batch.Resource.Attributes = append(batch.Resource.Attributes, common_v1.KeyValue{
 		Key:   "cluster",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 	})
 
-	batch.Resource.Attributes = append(batch.Resource.Attributes, &common_v1.KeyValue{
+	batch.Resource.Attributes = append(batch.Resource.Attributes, common_v1.KeyValue{
 		Key:   "ip",
-		Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+		Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 	})
 
 	p.PushSpans(context.Background(), &tempopb.PushSpansRequest{Batches: []*trace_v1.ResourceSpans{batch}})
@@ -1113,32 +1113,32 @@ func TestTargetInfoWithDifferentBatches(t *testing.T) {
 
 	// TODO give these spans some duration so we can verify latencies are recorded correctly, in fact we should also test with various span names etc.
 	batch := test.MakeBatch(10, nil)
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 	}
 
 	// batch 2 will have instance id & cluster
 	// this will create a target_info metric with job, instance, and cluster
 	batch2 := test.MakeBatch(10, nil)
-	batch2.Resource.Attributes = []*common_v1.KeyValue{
+	batch2.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add cluster
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
 
@@ -1146,16 +1146,16 @@ func TestTargetInfoWithDifferentBatches(t *testing.T) {
 	// this will create a target_info metric with job and ip only // no cluster no instance
 	batch3 := test.MakeBatch(10, nil)
 
-	batch3.Resource.Attributes = []*common_v1.KeyValue{
+	batch3.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add ip
 		{
 			Key:   "ip",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "1.1.1.1"}},
 		},
 	}
 
@@ -1206,32 +1206,32 @@ func TestEnableInstanceLabelFalse(t *testing.T) {
 
 	batchCount := 10
 	batch := test.MakeBatch(batchCount, nil)
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-abc"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-abc"}},
 		},
 		// add cluster
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
-	for _, ils := range batch.ScopeSpans {
-		for _, s := range ils.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "http.method",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "foo",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
 			})
 		}
 	}
@@ -1239,32 +1239,32 @@ func TestEnableInstanceLabelFalse(t *testing.T) {
 	// batch 2 will have instance id & cluster
 	// this will create a target_info metric with job, instance, and cluster
 	batch2 := test.MakeBatch(batchCount, nil)
-	batch2.Resource.Attributes = []*common_v1.KeyValue{
+	batch2.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add cluster
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
-	for _, ils := range batch2.ScopeSpans {
-		for _, s := range ils.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch2.ScopeSpans {
+		for j := range batch2.ScopeSpans[i].Spans {
+			batch2.ScopeSpans[i].Spans[j].Attributes = append(batch2.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "http.method",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch2.ScopeSpans[i].Spans[j].Attributes = append(batch2.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "foo",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
 			})
 		}
 	}
@@ -1326,32 +1326,32 @@ func TestEnableInstanceLabelUnset(t *testing.T) {
 
 	batchCount := 10
 	batch := test.MakeBatch(batchCount, nil)
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-abc"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-abc"}},
 		},
 		// add cluster
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
-	for _, ils := range batch.ScopeSpans {
-		for _, s := range ils.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "http.method",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "foo",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
 			})
 		}
 	}
@@ -1359,32 +1359,32 @@ func TestEnableInstanceLabelUnset(t *testing.T) {
 	// batch 2 will have instance id & cluster
 	// this will create a target_info metric with job, instance, and cluster
 	batch2 := test.MakeBatch(batchCount, nil)
-	batch2.Resource.Attributes = []*common_v1.KeyValue{
+	batch2.Resource.Attributes = []common_v1.KeyValue{
 		// add service name
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		// add instance
 		{
 			Key:   "service.instance.id",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "abc-instance-id-test-def"}},
 		},
 		// add cluster
 		{
 			Key:   "cluster",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "eu-west-0"}},
 		},
 	}
-	for _, ils := range batch2.ScopeSpans {
-		for _, s := range ils.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch2.ScopeSpans {
+		for j := range batch2.ScopeSpans[i].Spans {
+			batch2.ScopeSpans[i].Spans[j].Attributes = append(batch2.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "http.method",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "GET"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch2.ScopeSpans[i].Spans[j].Attributes = append(batch2.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "foo",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar"}},
 			})
 		}
 	}
@@ -1474,15 +1474,15 @@ func TestSpanMetricsDimensionMapping(t *testing.T) {
 	batch := test.MakeBatch(10, nil)
 
 	// Add some attributes
-	for _, rs := range batch.ScopeSpans {
-		for _, s := range rs.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "foo",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "foo-value"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "bar",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "bar-value"}},
 			})
 		}
 	}
@@ -1547,19 +1547,19 @@ func TestSpanMetricsDimensionMappingMissingLabels(t *testing.T) {
 	batch := test.MakeBatch(10, nil)
 
 	// Add some attributes
-	for _, rs := range batch.ScopeSpans {
-		for _, s := range rs.Spans {
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "first",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "first-value"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "first-value"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "world",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "world-value"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "world-value"}},
 			})
-			s.Attributes = append(s.Attributes, &common_v1.KeyValue{
+			batch.ScopeSpans[i].Spans[j].Attributes = append(batch.ScopeSpans[i].Spans[j].Attributes, common_v1.KeyValue{
 				Key:   "last",
-				Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "last-value"}},
+				Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "last-value"}},
 			})
 		}
 	}
@@ -1602,9 +1602,9 @@ func TestSpanMetricsNegativeLatency(t *testing.T) {
 
 	p.PushSpans(context.Background(), &tempopb.PushSpansRequest{
 		Batches: []*trace_v1.ResourceSpans{{
-			Resource: &resource_v1.Resource{},
-			ScopeSpans: []*trace_v1.ScopeSpans{{
-				Spans: []*trace_v1.Span{
+			Resource: resource_v1.Resource{},
+			ScopeSpans: []trace_v1.ScopeSpans{{
+				Spans: []trace_v1.Span{
 					{
 						StartTimeUnixNano: uint64(1),
 						EndTimeUnixNano:   uint64(0),
@@ -1753,18 +1753,18 @@ func TestTargetInfoSkipsLabelsStartingWithNumber(t *testing.T) {
 	defer p.Shutdown(context.Background())
 
 	batch := test.MakeBatch(1, nil)
-	batch.Resource.Attributes = []*common_v1.KeyValue{
+	batch.Resource.Attributes = []common_v1.KeyValue{
 		{
 			Key:   "service.name",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "test-service"}},
 		},
 		{
 			Key:   "5badlabel",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-be-ignored"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-be-ignored"}},
 		},
 		{
 			Key:   "good_label",
-			Value: &common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-appear"}},
+			Value: common_v1.AnyValue{Value: &common_v1.AnyValue_StringValue{StringValue: "should-appear"}},
 		},
 	}
 
@@ -1855,9 +1855,9 @@ func TestSpanMetricsTraceStateMultiplier(t *testing.T) {
 
 	// Create a batch with a span that has tracestate th:8 (50% sampling → multiplier 2)
 	batch := test.MakeBatch(1, nil)
-	for _, ils := range batch.ScopeSpans {
-		for _, span := range ils.Spans {
-			span.TraceState = "ot=th:8"
+	for i := range batch.ScopeSpans {
+		for j := range batch.ScopeSpans[i].Spans {
+			batch.ScopeSpans[i].Spans[j].TraceState = "ot=th:8"
 		}
 	}
 
