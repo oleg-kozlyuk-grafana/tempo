@@ -475,7 +475,8 @@ func generateTestLegacyOverrides() LegacyOverrides {
 		UnsafeQueryHints:     true,
 		MetricsSpanOnlyFetch: boolPtr(true),
 
-		MaxBytesPerTrace: 10 * 1024 * 1024,
+		MaxBytesPerTrace:               10 * 1024 * 1024,
+		BloomGatewayPublishesPerSecond: 50,
 
 		CostAttribution: CostAttributionOverrides{
 			MaxCardinality: 1000,
